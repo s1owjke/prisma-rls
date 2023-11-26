@@ -1,0 +1,32 @@
+{
+  "name": "prisma-extension-rls",
+  "version": "0.1.0",
+  "description": "Prisma client extension for row-level security",
+  "license": "MIT",
+  "keywords": [
+    "database",
+    "prisma",
+    "prisma-client",
+    "prisma-extension",
+    "rls"
+  ],
+  "author": "s1owjke",
+  "homepage": "https://github.com/s1owjke/prisma-extension-rls",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "build:watch": "rm -rf dist && tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@prisma/client": "latest"
+  },
+  "devDependencies": {
+    "@prisma/client": "latest",
+    "typescript": "^5.3.2"
+  }
+}
