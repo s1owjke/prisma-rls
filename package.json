@@ -1,7 +1,7 @@
 {
   "name": "prisma-extension-rls",
   "version": "0.1.0",
-  "description": "Prisma client extension for row-level security",
+  "description": "Prisma client extension for row-level security on any database",
   "license": "MIT",
   "keywords": [
     "database",
@@ -26,7 +26,7 @@
     "@prisma/client": "latest"
   },
   "devDependencies": {
-    "@prisma/client": "latest",
-    "typescript": "^5.3.2"
+    "@prisma/client": "^5.14.0",
+    "typescript": "^5.4.5"
   }
 }
