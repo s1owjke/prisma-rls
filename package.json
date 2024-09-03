@@ -1,5 +1,5 @@
 {
-  "name": "prisma-extension-rls",
+  "name": "prisma-rls",
   "version": "0.1.0",
   "description": "Prisma client extension for row-level security on any database",
   "license": "MIT",
