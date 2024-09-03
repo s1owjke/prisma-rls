@@ -117,7 +117,7 @@ const mergeRelationWhere = (
       }
     }
 
-    const fieldDef = fieldsMap[modelName][selectValue];
+    const fieldDef = fieldsMap[modelName][selectName];
 
     if (fieldDef.kind === "object") {
       const relationModelName = fieldDef.type;
