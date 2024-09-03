@@ -15,7 +15,7 @@ export type ModelPermissionsConfig<
   ModelName extends PrismaModelName<TypeMap>,
   Context extends unknown,
 > = {
-  select: boolean | PrismaModelWhere<TypeMap, ModelName> | ((context: Context) => PrismaModelWhere<TypeMap, ModelName>);
+  read: boolean | PrismaModelWhere<TypeMap, ModelName> | ((context: Context) => PrismaModelWhere<TypeMap, ModelName>);
   create: boolean;
   update: boolean | PrismaModelWhere<TypeMap, ModelName> | ((context: Context) => PrismaModelWhere<TypeMap, ModelName>);
   delete: boolean | PrismaModelWhere<TypeMap, ModelName> | ((context: Context) => PrismaModelWhere<TypeMap, ModelName>);

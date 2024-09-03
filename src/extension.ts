@@ -21,7 +21,7 @@ export const createRlsExtension = (
   }
 
   return Prisma.defineExtension({
-    name: "prisma-extension-rls",
+    name: "prisma-rls",
     query: {
       $allModels: {
         $allOperations({ model: modelName, operation, args, query }) {
@@ -30,13 +30,13 @@ export const createRlsExtension = (
           switch (operation) {
             case "findFirst":
             case "findUnique":
-              if (!modelPermissions.select) {
+              if (!modelPermissions.read) {
                 return Promise.resolve(null);
               }
               break;
             case "findFirstOrThrow":
             case "findUniqueOrThrow":
-              if (!modelPermissions.select) {
+              if (!modelPermissions.read) {
                 throw new PrismaClientKnownRequestError(`No ${modelName} found`, {
                   code: "P2025",
                   clientVersion: Prisma.prismaVersion.client,
@@ -44,12 +44,12 @@ export const createRlsExtension = (
               }
               break;
             case "findMany":
-              if (!modelPermissions.select) {
+              if (!modelPermissions.read) {
                 return Promise.resolve([]);
               }
               break;
             case "aggregate":
-              if (!modelPermissions.select) {
+              if (!modelPermissions.read) {
                 return query({
                   ...args,
                   where: generateImpossibleWhere(fieldsMap[modelName]),
@@ -57,12 +57,12 @@ export const createRlsExtension = (
               }
               break;
             case "count":
-              if (!modelPermissions.select) {
+              if (!modelPermissions.read) {
                 return Promise.resolve(0);
               }
               break;
             case "groupBy":
-              if (!modelPermissions.select) {
+              if (!modelPermissions.read) {
                 return Promise.resolve([]);
               }
               break;
@@ -94,7 +94,7 @@ export const createRlsExtension = (
           switch (operation) {
             case "findUnique":
             case "findUniqueOrThrow":
-              if (modelPermissions.select !== true || args.select || args.include) {
+              if (modelPermissions.read !== true || args.select || args.include) {
                 return query({
                   ...args,
                   ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
@@ -102,7 +102,7 @@ export const createRlsExtension = (
                     fieldsMap,
                     modelName,
                     args.where as Record<string, any>,
-                    resolveWhere(modelPermissions.select, context),
+                    resolveWhere(modelPermissions.read, context),
                   ),
                 });
               }
@@ -110,13 +110,13 @@ export const createRlsExtension = (
             case "findFirst":
             case "findFirstOrThrow":
             case "findMany":
-              if (modelPermissions.select !== true || args.select || args.include) {
+              if (modelPermissions.read !== true || args.select || args.include) {
                 return query({
                   ...args,
                   ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
                   where: mergeWhere(
                     args.where as Record<string, any> | undefined,
-                    resolveWhere(modelPermissions.select, context),
+                    resolveWhere(modelPermissions.read, context),
                   ),
                 });
               }
@@ -124,12 +124,12 @@ export const createRlsExtension = (
             case "aggregate":
             case "count":
             case "groupBy":
-              if (modelPermissions.select !== true) {
+              if (modelPermissions.read !== true) {
                 return query({
                   ...args,
                   where: mergeWhere(
                     args.where as Record<string, any> | undefined,
-                    resolveWhere(modelPermissions.select, context),
+                    resolveWhere(modelPermissions.read, context),
                   ),
                 });
               }

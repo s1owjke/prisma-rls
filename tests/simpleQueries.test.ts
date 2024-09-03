@@ -8,13 +8,13 @@ describe("simple queries", () => {
   describe("read only permissions", () => {
     const readOnlyPermissions: PermissionsConfig<Prisma.TypeMap, null> = {
       Post: {
-        select: { published: { equals: true } },
+        read: { published: { equals: true } },
         create: false,
         update: false,
         delete: false,
       },
       User: {
-        select: { email: { not: { equals: "zara.nightshade@test.local" } } },
+        read: { email: { not: { equals: "zara.nightshade@test.local" } } },
         create: false,
         update: false,
         delete: false,
@@ -39,7 +39,10 @@ describe("simple queries", () => {
     });
 
     test("unable to update user", async () => {
-      const updatedUser = db.user.update({ where: { email: "zara.nightshade@test.local" }, data: { name: "Zara Nightshade" } });
+      const updatedUser = db.user.update({
+        where: { email: "zara.nightshade@test.local" },
+        data: { name: "Zara Nightshade" },
+      });
       await expect(updatedUser).rejects.toThrow("Not authorized");
     });
 

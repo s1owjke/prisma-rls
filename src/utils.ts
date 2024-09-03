@@ -92,7 +92,7 @@ const generateModelRelationsCount = (
       const relationModelName = fieldDef.type;
       const relationPermissions = permissionsConfig[relationModelName];
 
-      select[fieldName] = { where: resolveWhere(relationPermissions.select, context) };
+      select[fieldName] = { where: resolveWhere(relationPermissions.read, context) };
     }
   }
 
@@ -123,11 +123,11 @@ const mergeRelationWhere = (
       const relationModelName = fieldDef.type;
       const relationPermissions = permissionsConfig[relationModelName];
 
-      if (relationPermissions.select === false) {
+      if (relationPermissions.read === false) {
         return { where: generateImpossibleWhere(fieldsMap[modelName]) };
-      } else if (relationPermissions.select !== true && selectValue === true) {
-        return { where: resolveWhere(relationPermissions.select, context) };
-      } else if (relationPermissions.select !== true && selectValue !== false) {
+      } else if (relationPermissions.read !== true && selectValue === true) {
+        return { where: resolveWhere(relationPermissions.read, context) };
+      } else if (relationPermissions.read !== true && selectValue !== false) {
         return {
           ...selectValue,
           ...mergeSelectAndInclude(
@@ -138,7 +138,7 @@ const mergeRelationWhere = (
             selectValue.select,
             selectValue.include,
           ),
-          where: mergeWhere(selectValue.where, resolveWhere(relationPermissions.select, context)),
+          where: mergeWhere(selectValue.where, resolveWhere(relationPermissions.read, context)),
         };
       }
     }
