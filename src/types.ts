@@ -1,5 +1,7 @@
+import type { DMMF } from "@prisma/client/runtime/library";
+
 export type PrismaTypeMap = {
-  model: Record<string, { operations: { findMany: { args: { where: Record<string, any> } } } }>;
+  model: Record<string, any>;
 };
 
 type PrismaModelName<TypeMap extends PrismaTypeMap> = keyof TypeMap["model"];
@@ -22,3 +24,5 @@ export type ModelPermissionsConfig<
 export type PermissionsConfig<TypeMap extends PrismaTypeMap, Context extends unknown> = {
   [ModelName in PrismaModelName<TypeMap>]: ModelPermissionsConfig<TypeMap, ModelName, Context>;
 };
+
+export type FieldsMap = Record<string, Record<string, DMMF.Field>>;

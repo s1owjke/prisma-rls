@@ -13,32 +13,32 @@ It's important to keep in mind that this extension doesn't cover raw queries. In
 Extend the Prisma client with the rls extension
 
 ```typescript
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { createRlsExtension } from "prisma-extension-rls";
 
 import { permissions } from "./permissions";
 
-const db = new PrismaClient().$extends(createRlsExtension(permissions));
+const db = new PrismaClient().$extends(createRlsExtension(Prisma.dmmf, permissions, null));
 ```
 
 Since Prisma doesn't support contexts to pass data to the [extensions](https://www.prisma.io/docs/orm/prisma-client/client-extensions), you will typically extend the Prisma client per request (based on current auth toke role)
 
 ```typescript
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import Fastify, { FastifyRequest } from "fastify";
 import { createRlsExtension } from "prisma-extension-rls";
 
 import { permissions } from "./permissions";
 
 (async () => {
-  const dbBase = new PrismaClient();
+  const prisma = new PrismaClient();
   const server = Fastify();
 
   const resolveConext = (request: FastifyRequest) => {
     const role = resolveRole(request.headers.authorization);
     const rolePermissions = permissions[role];
 
-    return { db: dbBase.$extends(createRlsExtension(rolePermissions)) };
+    return { db: prisma.$extends(createRlsExtension(Prisma.dmmf, rolePermissions, { role })) };
   }
   
   server.get('/post/count', async function handler(request, reply) {

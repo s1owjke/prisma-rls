@@ -1,16 +1,31 @@
 import { Prisma } from "@prisma/client/extension";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import type { BaseDMMF } from "@prisma/client/runtime/library";
 
-import { PermissionsConfig, PrismaTypeMap } from "./types";
-import { mergeWhere, mergeWhereUnique, resolveWhere, transformSelectAndInclude } from "./utils";
+import type { FieldsMap, PermissionsConfig, PrismaTypeMap } from "./types";
+import { mergeWhere, mergeWhereUnique, resolveWhere, mergeSelectAndInclude, generateImpossibleWhere } from "./utils";
 
-export const createRlsExtension = (permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>, context: unknown) => {
+export const createRlsExtension = (
+  dmmf: BaseDMMF,
+  permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>,
+  context: unknown,
+) => {
+  const fieldsMap: FieldsMap = {};
+
+  for (const model of dmmf.datamodel.models) {
+    fieldsMap[model.name] = {};
+
+    for (const field of model.fields) {
+      fieldsMap[model.name][field.name] = field;
+    }
+  }
+
   return Prisma.defineExtension({
     name: "prisma-extension-rls",
     query: {
       $allModels: {
-        $allOperations({ model, operation, args, query }) {
-          const anyArgs = args as any;
-          const modelPermissions = permissionsConfig[model];
+        $allOperations({ model: modelName, operation, args, query }) {
+          const modelPermissions = permissionsConfig[modelName];
 
           switch (operation) {
             case "findFirst":
@@ -22,8 +37,10 @@ export const createRlsExtension = (permissionsConfig: PermissionsConfig<PrismaTy
             case "findFirstOrThrow":
             case "findUniqueOrThrow":
               if (!modelPermissions.select) {
-                // TODO: exception similar to prisma not-found
-                throw new Error("Nothing found");
+                throw new PrismaClientKnownRequestError(`No ${modelName} found`, {
+                  code: "P2025",
+                  clientVersion: Prisma.prismaVersion.client,
+                });
               }
               break;
             case "findMany":
@@ -33,8 +50,10 @@ export const createRlsExtension = (permissionsConfig: PermissionsConfig<PrismaTy
               break;
             case "aggregate":
               if (!modelPermissions.select) {
-                // TODO: construct fake response with null instead of aggregated
-                return Promise.resolve({});
+                return query({
+                  ...args,
+                  where: generateImpossibleWhere(fieldsMap[modelName]),
+                });
               }
               break;
             case "count":
@@ -50,28 +69,24 @@ export const createRlsExtension = (permissionsConfig: PermissionsConfig<PrismaTy
             case "create":
             case "createMany":
               if (!modelPermissions.create) {
-                // TODO: exception similar to prisma couldn't create
-                throw new Error("Couldn't create");
+                throw new Error("Not authorized");
               }
-              throw new Error();
+              break;
             case "update":
             case "updateMany":
               if (!modelPermissions.update) {
-                // TODO: exception similar to prisma couldn't update
-                throw new Error("Couldn't update");
+                throw new Error("Not authorized");
               }
               break;
             case "upsert":
               if (!modelPermissions.create || !modelPermissions.update) {
-                // TODO: exception similar to prisma couldn't upsert
-                throw new Error("Couldn't upsert");
+                throw new Error("Not authorized");
               }
               break;
             case "delete":
             case "deleteMany":
               if (!modelPermissions.delete) {
-                // TODO: exception similar to prisma couldn't delete
-                throw new Error("Couldn't delete");
+                throw new Error("Not authorized");
               }
               break;
           }
@@ -79,70 +94,115 @@ export const createRlsExtension = (permissionsConfig: PermissionsConfig<PrismaTy
           switch (operation) {
             case "findUnique":
             case "findUniqueOrThrow":
-              if (typeof modelPermissions.select !== "boolean") {
+              if (modelPermissions.select !== true || args.select || args.include) {
                 return query({
                   ...args,
-                  ...transformSelectAndInclude(anyArgs.select, anyArgs.include),
-                  where: mergeWhereUnique(anyArgs.where, resolveWhere(modelPermissions.select, context)),
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  where: mergeWhereUnique(
+                    fieldsMap,
+                    modelName,
+                    args.where as Record<string, any>,
+                    resolveWhere(modelPermissions.select, context),
+                  ),
                 });
               }
               break;
             case "findFirst":
             case "findFirstOrThrow":
             case "findMany":
+              if (modelPermissions.select !== true || args.select || args.include) {
+                return query({
+                  ...args,
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  where: mergeWhere(
+                    args.where as Record<string, any> | undefined,
+                    resolveWhere(modelPermissions.select, context),
+                  ),
+                });
+              }
+              break;
             case "aggregate":
             case "count":
             case "groupBy":
-              if (typeof modelPermissions.select !== "boolean") {
+              if (modelPermissions.select !== true) {
                 return query({
                   ...args,
-                  ...transformSelectAndInclude(anyArgs.select, anyArgs.include),
-                  where: mergeWhere(anyArgs.where, resolveWhere(modelPermissions.select, context)),
+                  where: mergeWhere(
+                    args.where as Record<string, any> | undefined,
+                    resolveWhere(modelPermissions.select, context),
+                  ),
+                });
+              }
+              break;
+            case "create":
+              if (args.select || args.include) {
+                return query({
+                  ...args,
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
                 });
               }
               break;
             case "update":
-              if (typeof modelPermissions.update !== "boolean") {
+              if (modelPermissions.update !== true || args.select || args.include) {
                 return query({
-                  ...anyArgs,
-                  ...transformSelectAndInclude(anyArgs.select, anyArgs.include),
-                  where: mergeWhereUnique(anyArgs.where, resolveWhere(modelPermissions.update, context)),
+                  ...args,
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  where: mergeWhereUnique(
+                    fieldsMap,
+                    modelName,
+                    args.where as Record<string, any>,
+                    resolveWhere(modelPermissions.update, context),
+                  ),
                 });
               }
               break;
             case "updateMany":
-              if (typeof modelPermissions.update !== "boolean") {
+              if (modelPermissions.update !== true || args.select || args.include) {
                 return query({
                   ...args,
-                  ...transformSelectAndInclude(anyArgs.select, anyArgs.include),
-                  where: mergeWhere(anyArgs.where, resolveWhere(modelPermissions.update, context)),
+                  where: mergeWhere(
+                    args.where as Record<string, any> | undefined,
+                    resolveWhere(modelPermissions.update, context),
+                  ),
                 });
               }
               break;
             case "upsert":
-              if (typeof modelPermissions.update !== "boolean") {
+              if (modelPermissions.update !== true || args.select || args.include) {
                 return query({
-                  ...anyArgs,
-                  ...transformSelectAndInclude(anyArgs.select, anyArgs.include),
-                  update: mergeWhereUnique(anyArgs.where, resolveWhere(modelPermissions.update, context)),
+                  ...args,
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  where: mergeWhereUnique(
+                    fieldsMap,
+                    modelName,
+                    args.where as Record<string, any>,
+                    resolveWhere(modelPermissions.update, context),
+                  ),
                 });
               }
               break;
             case "delete":
-              if (typeof modelPermissions.delete !== "boolean") {
+              if (modelPermissions.delete !== true || args.select || args.include) {
                 return query({
-                  ...anyArgs,
-                  ...transformSelectAndInclude(anyArgs.select, anyArgs.include),
-                  where: mergeWhereUnique(anyArgs.where, resolveWhere(modelPermissions.delete, context)),
+                  ...args,
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  where: mergeWhereUnique(
+                    fieldsMap,
+                    modelName,
+                    args.where as Record<string, any>,
+                    resolveWhere(modelPermissions.delete, context),
+                  ),
                 });
               }
               break;
             case "deleteMany":
-              if (typeof modelPermissions.delete !== "boolean") {
+              if (modelPermissions.delete !== true) {
                 return query({
-                  ...anyArgs,
-                  ...transformSelectAndInclude(anyArgs.select, anyArgs.include),
-                  where: mergeWhere(anyArgs.where, resolveWhere(modelPermissions.delete, context)),
+                  ...args,
+                  where: mergeWhere(
+                    args.where as Record<string, any> | undefined,
+                    resolveWhere(modelPermissions.delete, context),
+                  ),
                 });
               }
               break;

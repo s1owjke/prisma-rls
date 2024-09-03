@@ -23,7 +23,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@prisma/client": "latest"
+    "@prisma/client": ">=4.16.1"
   },
   "devDependencies": {
     "@prisma/client": "^5.14.0",
