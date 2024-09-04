@@ -19,6 +19,12 @@ describe("simple queries", () => {
         update: false,
         delete: false,
       },
+      Comment: {
+        read: true,
+        create: false,
+        update: false,
+        delete: false,
+      },
     };
 
     const db = prisma.$extends(createRlsExtension(Prisma.dmmf, readOnlyPermissions, null));

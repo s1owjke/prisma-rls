@@ -13,9 +13,17 @@ import { PrismaClient } from "@prisma/client";
 
   await prisma.post.createMany({
     data: [
-      { published: true, authorId: 1, title: "Quick bites", content: "Easy 5-minute snack recipes" },
-      { published: false, authorId: 1, title: "Tech today", content: "Latest gadget news & reviews" },
-      { published: true, authorId: 2, title: "Green living", content: "Eco-friendly home hacks" },
+      { id: 1, published: true, authorId: 1, title: "Quick bites", content: "Easy 5-minute snack recipes" },
+      { id: 2, published: false, authorId: 1, title: "Tech today", content: "Latest gadget news & reviews" },
+      { id: 3, published: true, authorId: 2, title: "Green living", content: "Eco-friendly home hacks" },
+    ],
+  });
+
+  await prisma.comment.createMany({
+    data: [
+      { postId: 1, content: "Easy 5-minute snack recipes" },
+      { postId: 2, content: "Latest gadget news & reviews" },
+      { postId: 3, content: "Eco-friendly home hacks" },
     ],
   });
 
