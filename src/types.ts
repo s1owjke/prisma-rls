@@ -10,11 +10,7 @@ export type PrismaModelWhere<TypeMap extends PrismaTypeMap, Model extends Prisma
   TypeMap["model"][Model]["operations"]["findMany"]["args"]["where"]
 >;
 
-export type ModelPermissionsConfig<
-  TypeMap extends PrismaTypeMap,
-  ModelName extends PrismaModelName<TypeMap>,
-  Context extends unknown,
-> = {
+export type ModelPermissionsConfig<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>, Context extends unknown> = {
   read: boolean | PrismaModelWhere<TypeMap, ModelName> | ((context: Context) => PrismaModelWhere<TypeMap, ModelName>);
   create: boolean;
   update: boolean | PrismaModelWhere<TypeMap, ModelName> | ((context: Context) => PrismaModelWhere<TypeMap, ModelName>);

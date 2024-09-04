@@ -3,13 +3,17 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import type { BaseDMMF } from "@prisma/client/runtime/library";
 
 import type { FieldsMap, PermissionsConfig, PrismaTypeMap } from "./types";
-import { mergeWhere, mergeWhereUnique, resolveWhere, mergeSelectAndInclude, generateImpossibleWhere } from "./utils";
+import {
+  generateImpossibleWhere,
+  mergeCreateData,
+  mergeSelectAndInclude,
+  mergeUpdateData,
+  mergeWhere,
+  mergeWhereUnique,
+  resolveWhere,
+} from "./utils";
 
-export const createRlsExtension = (
-  dmmf: BaseDMMF,
-  permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>,
-  context: unknown,
-) => {
+export const createRlsExtension = (dmmf: BaseDMMF, permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>, context: unknown) => {
   const fieldsMap: FieldsMap = {};
 
   for (const model of dmmf.datamodel.models) {
@@ -98,12 +102,7 @@ export const createRlsExtension = (
                 return query({
                   ...args,
                   ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  where: mergeWhereUnique(
-                    fieldsMap,
-                    modelName,
-                    args.where as Record<string, any>,
-                    resolveWhere(modelPermissions.read, context),
-                  ),
+                  where: mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.read, context)),
                 });
               }
               break;
@@ -114,10 +113,7 @@ export const createRlsExtension = (
                 return query({
                   ...args,
                   ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  where: mergeWhere(
-                    args.where as Record<string, any> | undefined,
-                    resolveWhere(modelPermissions.read, context),
-                  ),
+                  where: mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.read, context)),
                 });
               }
               break;
@@ -127,32 +123,26 @@ export const createRlsExtension = (
               if (modelPermissions.read !== true) {
                 return query({
                   ...args,
-                  where: mergeWhere(
-                    args.where as Record<string, any> | undefined,
-                    resolveWhere(modelPermissions.read, context),
-                  ),
+                  where: mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.read, context)),
                 });
               }
               break;
             case "create":
-              if (args.select || args.include) {
+              if (args.select || args.include || args.data) {
                 return query({
                   ...args,
                   ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  data: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.data as Record<string, any>),
                 });
               }
               break;
             case "update":
-              if (modelPermissions.update !== true || args.select || args.include) {
+              if (modelPermissions.update !== true || args.select || args.include || args.data) {
                 return query({
                   ...args,
                   ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  where: mergeWhereUnique(
-                    fieldsMap,
-                    modelName,
-                    args.where as Record<string, any>,
-                    resolveWhere(modelPermissions.update, context),
-                  ),
+                  data: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.data as Record<string, any>),
+                  where: mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.update, context)),
                 });
               }
               break;
@@ -160,24 +150,18 @@ export const createRlsExtension = (
               if (modelPermissions.update !== true || args.select || args.include) {
                 return query({
                   ...args,
-                  where: mergeWhere(
-                    args.where as Record<string, any> | undefined,
-                    resolveWhere(modelPermissions.update, context),
-                  ),
+                  where: mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.update, context)),
                 });
               }
               break;
             case "upsert":
-              if (modelPermissions.update !== true || args.select || args.include) {
+              if (modelPermissions.update !== true || args.select || args.include || args.data) {
                 return query({
                   ...args,
                   ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  where: mergeWhereUnique(
-                    fieldsMap,
-                    modelName,
-                    args.where as Record<string, any>,
-                    resolveWhere(modelPermissions.update, context),
-                  ),
+                  create: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.create as Record<string, any>),
+                  update: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.update as Record<string, any>),
+                  where: mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.update, context)),
                 });
               }
               break;
@@ -186,12 +170,7 @@ export const createRlsExtension = (
                 return query({
                   ...args,
                   ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  where: mergeWhereUnique(
-                    fieldsMap,
-                    modelName,
-                    args.where as Record<string, any>,
-                    resolveWhere(modelPermissions.delete, context),
-                  ),
+                  where: mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.delete, context)),
                 });
               }
               break;
@@ -199,10 +178,7 @@ export const createRlsExtension = (
               if (modelPermissions.delete !== true) {
                 return query({
                   ...args,
-                  where: mergeWhere(
-                    args.where as Record<string, any> | undefined,
-                    resolveWhere(modelPermissions.delete, context),
-                  ),
+                  where: mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.delete, context)),
                 });
               }
               break;

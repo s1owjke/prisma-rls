@@ -2,20 +2,16 @@ import type { DMMF } from "@prisma/client/runtime/library";
 
 import type { FieldsMap, PermissionsConfig, PrismaTypeMap } from "./types";
 
-const mapValues = <T extends Record<string, any>>(
-  object: T,
-  iteratee: (value: T[keyof T], key: keyof T) => T[keyof T],
-) => {
-  return Object.fromEntries(
-    Object.entries(object).map(([key, value]) => {
-      return [key, iteratee(value, key)];
-    }),
-  );
+const mapValues = <T extends Record<string, any>>(object: T, iteratee: (value: T[keyof T], key: keyof T) => T[keyof T]) => {
+  return Object.fromEntries(Object.entries(object).map(([key, value]) => [key, iteratee(value, key)]));
+};
+
+const transformValue = <T extends any>(value: T | T[], callback: (value: T) => T) => {
+  return Array.isArray(value) ? value.map(callback) : callback(value);
 };
 
 export const generateImpossibleWhere = (fields: Record<string, DMMF.Field>): Record<string, any> => {
   const targetField = Object.values(fields).find((field) => field.isId || field.isUnique);
-
   if (!targetField) {
     throw new Error("Couldn't find required id or unique field");
   }
@@ -43,17 +39,11 @@ export const generateImpossibleWhere = (fields: Record<string, DMMF.Field>): Rec
   }
 };
 
-export const resolveWhere = (
-  where: Record<string, any> | ((context: unknown) => Record<string, any>),
-  context: unknown,
-): Record<string, any> => {
+export const resolveWhere = (where: Record<string, any> | ((context: unknown) => Record<string, any>), context: unknown): Record<string, any> => {
   return typeof where === "function" ? where(context) : where;
 };
 
-export const mergeWhere = (
-  first: Record<string, any> | undefined,
-  second: Record<string, any>,
-): Record<string, any> => {
+export const mergeWhere = (first: Record<string, any> | undefined, second: Record<string, any>): Record<string, any> => {
   return first ? { AND: [first, second] } : second;
 };
 
@@ -99,7 +89,7 @@ const generateModelRelationsCount = (
   return select;
 };
 
-const mergeRelationWhere = (
+const mergeRelationSelect = (
   permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>,
   context: unknown,
   fieldsMap: FieldsMap,
@@ -111,36 +101,30 @@ const mergeRelationWhere = (
       if (selectValue === true) {
         return { select: generateModelRelationsCount(permissionsConfig, context, fieldsMap, modelName) };
       } else if (selectValue !== false && selectValue.select) {
-        return { select: mergeRelationWhere(permissionsConfig, context, fieldsMap, modelName, selectValue.select) };
+        return { select: mergeRelationSelect(permissionsConfig, context, fieldsMap, modelName, selectValue.select) };
       } else {
         return selectValue;
       }
     }
 
     const fieldDef = fieldsMap[modelName][selectName];
+    if (fieldDef.kind !== "object") {
+      return selectValue;
+    }
 
-    if (fieldDef.kind === "object") {
-      const relationModelName = fieldDef.type;
-      const relationPermissions = permissionsConfig[relationModelName];
+    const relationModelName = fieldDef.type;
+    const relationPermissions = permissionsConfig[relationModelName];
 
-      if (relationPermissions.read === false) {
-        return { where: generateImpossibleWhere(fieldsMap[modelName]) };
-      } else if (relationPermissions.read !== true && selectValue === true) {
-        return { where: resolveWhere(relationPermissions.read, context) };
-      } else if (relationPermissions.read !== true && selectValue !== false) {
-        return {
-          ...selectValue,
-          ...mergeSelectAndInclude(
-            permissionsConfig,
-            context,
-            fieldsMap,
-            relationModelName,
-            selectValue.select,
-            selectValue.include,
-          ),
-          where: mergeWhere(selectValue.where, resolveWhere(relationPermissions.read, context)),
-        };
-      }
+    if (relationPermissions.read === false) {
+      return { where: generateImpossibleWhere(fieldsMap[modelName]) };
+    } else if (relationPermissions.read !== true && selectValue === true) {
+      return { where: resolveWhere(relationPermissions.read, context) };
+    } else if (relationPermissions.read !== true && selectValue !== false) {
+      return {
+        ...selectValue,
+        ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, relationModelName, selectValue.select, selectValue.include),
+        where: mergeWhere(selectValue.where, resolveWhere(relationPermissions.read, context)),
+      };
     }
 
     return selectValue;
@@ -156,10 +140,153 @@ export const mergeSelectAndInclude = (
   include: Record<string, any> | undefined,
 ): Record<string, any> => {
   if (select) {
-    return { select: mergeRelationWhere(permissionsConfig, context, fieldsMap, modelName, select) };
+    return { select: mergeRelationSelect(permissionsConfig, context, fieldsMap, modelName, select) };
   } else if (include) {
-    return { include: mergeRelationWhere(permissionsConfig, context, fieldsMap, modelName, include) };
+    return { include: mergeRelationSelect(permissionsConfig, context, fieldsMap, modelName, include) };
   } else {
     return {};
   }
+};
+
+export const mergeCreateData = (
+  permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>,
+  context: unknown,
+  fieldsMap: FieldsMap,
+  modelName: string,
+  data: Record<string, any>,
+): Record<string, any> => {
+  return mapValues(data, (dataValue, dataName) => {
+    const fieldDef = fieldsMap[modelName][dataName];
+    if (fieldDef.kind !== "object") {
+      return dataValue;
+    }
+
+    const relationModelName = fieldDef.type;
+    const relationPermissions = permissionsConfig[relationModelName];
+
+    if (fieldDef.isList) {
+      return mapValues(dataValue, (actionValue, actionName) => {
+        switch (actionName) {
+          case "create":
+            if (relationPermissions.create === false) {
+              throw new Error("Not authorized");
+            } else {
+              return transformValue(actionValue, (value) => {
+                return mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, value);
+              });
+            }
+          case "createMany":
+            if (relationPermissions.create === false) {
+              throw new Error("Not authorized");
+            }
+            break;
+          case "connectOrCreate":
+            if (relationPermissions.create === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.read === false) {
+              return transformValue(actionValue, (value) => {
+                return {
+                  where: mergeWhereUnique(fieldsMap, relationModelName, value.where, generateImpossibleWhere(fieldsMap[relationModelName])),
+                  create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, value),
+                };
+              });
+            } else if (relationPermissions.read !== true) {
+              return transformValue(actionValue, (value) => {
+                return {
+                  where: mergeWhereUnique(fieldsMap, relationModelName, value.where, resolveWhere(relationPermissions.read, context)),
+                  create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, value),
+                };
+              });
+            }
+            break;
+          case "connect":
+            if (relationPermissions.read === false) {
+              return transformValue(actionValue, (value) => {
+                return mergeWhereUnique(fieldsMap, relationModelName, value, generateImpossibleWhere(fieldsMap[relationModelName]));
+              });
+            } else if (relationPermissions.read !== true) {
+              return transformValue(actionValue, (value) => {
+                return mergeWhereUnique(fieldsMap, relationModelName, value, resolveWhere(relationPermissions.read, context));
+              });
+            }
+            break;
+          default:
+            throw new Error("Not implemented");
+        }
+
+        return actionValue;
+      });
+    } else {
+      return mapValues(dataValue, (actionValue, actionName) => {
+        switch (actionName) {
+          case "create":
+            if (relationPermissions.create === false) {
+              throw new Error("Not authorized");
+            } else {
+              return mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue);
+            }
+          case "connectOrCreate":
+            if (relationPermissions.create === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.read === false) {
+              return {
+                where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, generateImpossibleWhere(fieldsMap[relationModelName])),
+                create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue),
+              };
+            } else if (relationPermissions.read !== true) {
+              return {
+                where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, resolveWhere(relationPermissions.read, context)),
+                create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue),
+              };
+            }
+            break;
+          case "connect":
+            if (relationPermissions.read === false) {
+              return mergeWhereUnique(fieldsMap, relationModelName, actionValue, generateImpossibleWhere(fieldsMap[relationModelName]));
+            } else if (relationPermissions.read !== true) {
+              return mergeWhereUnique(fieldsMap, relationModelName, actionValue, resolveWhere(relationPermissions.read, context));
+            }
+            break;
+          default:
+            throw new Error("Not implemented");
+        }
+
+        return actionValue;
+      });
+    }
+  });
+};
+
+export const mergeUpdateData = (
+  permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>,
+  context: unknown,
+  fieldsMap: FieldsMap,
+  modelName: string,
+  data: Record<string, any>,
+): Record<string, any> => {
+  return mapValues(data, (dataValue, dataName) => {
+    const fieldDef = fieldsMap[modelName][dataName];
+    if (fieldDef.kind !== "object") {
+      return dataValue;
+    }
+
+    const relationModelName = fieldDef.type;
+    const relationPermissions = permissionsConfig[relationModelName];
+
+    if (fieldDef.isList) {
+      return mapValues(dataValue, (actionValue, actionName) => {
+        switch (actionName) {
+          default:
+            throw new Error("Not implemented");
+        }
+      });
+    } else {
+      return mapValues(dataValue, (actionValue, actionName) => {
+        switch (actionName) {
+          default:
+            throw new Error("Not implemented");
+        }
+      });
+    }
+  });
 };

@@ -39,10 +39,7 @@ describe("simple queries", () => {
     });
 
     test("unable to update user", async () => {
-      const updatedUser = db.user.update({
-        where: { email: "zara.nightshade@test.local" },
-        data: { name: "Zara Nightshade" },
-      });
+      const updatedUser = db.user.update({ where: { email: "zara.nightshade@test.local" }, data: { name: "Zara Nightshade" } });
       await expect(updatedUser).rejects.toThrow("Not authorized");
     });
 
@@ -54,6 +51,7 @@ describe("simple queries", () => {
     test("filter applied for nested relations", async () => {
       const users = await db.user.findMany({ include: { posts: true } });
       expect(users).toHaveLength(2);
+
       expect(users[0].posts).toHaveLength(0);
       expect(users[1].posts).toHaveLength(1);
     });
