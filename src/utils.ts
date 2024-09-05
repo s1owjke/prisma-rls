@@ -286,6 +286,125 @@ export const mergeUpdateData = (
     if (fieldDef.isList) {
       return mapValues(dataValue, (actionValue, actionName) => {
         switch (actionName) {
+          case "create":
+            if (relationPermissions.create === false) {
+              throw new Error("Not authorized");
+            } else {
+              return transformValue(actionValue, (value) => {
+                return mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, value);
+              });
+            }
+          case "createMany":
+            if (relationPermissions.create === false) {
+              throw new Error("Not authorized");
+            }
+            break;
+          case "connectOrCreate":
+            if (relationPermissions.create === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.read === false) {
+              return transformValue(actionValue, (value) => {
+                return {
+                  create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, value.create),
+                  where: mergeWhereUnique(fieldsMap, relationModelName, value.where, generateImpossibleWhere(fieldsMap[relationModelName])),
+                };
+              });
+            } else if (relationPermissions.read !== true) {
+              return transformValue(actionValue, (value) => {
+                return {
+                  create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, value.create),
+                  where: mergeWhereUnique(fieldsMap, relationModelName, value.where, resolveWhere(relationPermissions.read, context)),
+                };
+              });
+            } else {
+              return transformValue(actionValue, (value) => {
+                return {
+                  create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, value.create),
+                  where: value.where,
+                };
+              });
+            }
+          case "set":
+          case "connect":
+          case "disconnect":
+            if (relationPermissions.read === false) {
+              return transformValue(actionValue, (value) => {
+                return mergeWhereUnique(fieldsMap, relationModelName, value, generateImpossibleWhere(fieldsMap[relationModelName]));
+              });
+            } else if (relationPermissions.read !== true) {
+              return transformValue(actionValue, (value) => {
+                return mergeWhereUnique(fieldsMap, relationModelName, value, resolveWhere(relationPermissions.read, context));
+              });
+            }
+            break;
+          case "update":
+            if (relationPermissions.update === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.update !== true) {
+              return transformValue(actionValue, (value) => {
+                return {
+                  data: mergeUpdateData(permissionsConfig, context, fieldsMap, relationModelName, value.data),
+                  where: mergeWhereUnique(fieldsMap, relationModelName, value.where, resolveWhere(relationPermissions.update, context)),
+                };
+              });
+            } else {
+              return transformValue(actionValue, (value) => {
+                return {
+                  data: mergeUpdateData(permissionsConfig, context, fieldsMap, relationModelName, value.data),
+                  where: value.where,
+                };
+              });
+            }
+          case "updateMany":
+            if (relationPermissions.update === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.update !== true) {
+              return transformValue(actionValue, (value) => {
+                return {
+                  data: value.data,
+                  where: mergeWhere(value.where, resolveWhere(relationPermissions.update, context)),
+                };
+              });
+            }
+            break;
+          case "upsert":
+            if (relationPermissions.create === false || relationPermissions.update === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.update !== true) {
+              return transformValue(actionValue, (value) => {
+                return {
+                  create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, value.create),
+                  update: mergeUpdateData(permissionsConfig, context, fieldsMap, relationModelName, value.update),
+                  where: mergeWhereUnique(fieldsMap, relationModelName, value.where, resolveWhere(relationPermissions.update, context)),
+                };
+              });
+            } else {
+              return transformValue(actionValue, (value) => {
+                return {
+                  create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, value.create),
+                  update: mergeUpdateData(permissionsConfig, context, fieldsMap, relationModelName, value.update),
+                  where: value.where,
+                };
+              });
+            }
+          case "delete":
+            if (relationPermissions.delete === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.delete !== true) {
+              return transformValue(actionValue, (value) => {
+                return mergeWhereUnique(fieldsMap, relationModelName, value, resolveWhere(relationPermissions.delete, context));
+              });
+            }
+            break;
+          case "deleteMany":
+            if (relationPermissions.delete === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.delete !== true) {
+              return transformValue(actionValue, (value) => {
+                return mergeWhere(value, resolveWhere(relationPermissions.delete, context));
+              });
+            }
+            break;
           default:
             throw new Error("Not implemented");
         }
@@ -293,6 +412,86 @@ export const mergeUpdateData = (
     } else {
       return mapValues(dataValue, (actionValue, actionName) => {
         switch (actionName) {
+          case "create":
+            if (relationPermissions.create === false) {
+              throw new Error("Not authorized");
+            } else {
+              return mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue);
+            }
+          case "connectOrCreate":
+            if (relationPermissions.create === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.read === false) {
+              return {
+                create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue.create),
+                where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, generateImpossibleWhere(fieldsMap[relationModelName])),
+              };
+            } else if (relationPermissions.read !== true) {
+              return {
+                create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue.create),
+                where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, resolveWhere(relationPermissions.read, context)),
+              };
+            } else {
+              return {
+                create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue.create),
+                where: actionValue.where,
+              };
+            }
+          case "connect":
+            if (relationPermissions.read === false) {
+              return mergeWhereUnique(fieldsMap, relationModelName, actionValue, generateImpossibleWhere(fieldsMap[relationModelName]));
+            } else if (relationPermissions.read !== true) {
+              return mergeWhereUnique(fieldsMap, relationModelName, actionValue, resolveWhere(relationPermissions.read, context));
+            }
+            break;
+          case "disconnect":
+            if (relationPermissions.read === false) {
+              return mergeWhere(actionValue, generateImpossibleWhere(fieldsMap[relationModelName]));
+            } else if (relationPermissions.read !== true && actionValue === true) {
+              return resolveWhere(relationPermissions.read, context);
+            } else if (relationPermissions.read !== true && actionValue !== true) {
+              return mergeWhere(actionValue, resolveWhere(relationPermissions.read, context));
+            }
+            break;
+          case "update":
+            if (relationPermissions.update === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.update !== true) {
+              return {
+                data: mergeUpdateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue.data),
+                where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, resolveWhere(relationPermissions.update, context)),
+              };
+            } else {
+              return {
+                data: mergeUpdateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue.data),
+                where: actionValue.where,
+              };
+            }
+          case "upsert":
+            if (relationPermissions.create === false || relationPermissions.update === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.update !== true) {
+              return {
+                create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue.create),
+                update: mergeUpdateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue.update),
+                where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, resolveWhere(relationPermissions.update, context)),
+              };
+            } else {
+              return {
+                create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue.create),
+                update: mergeUpdateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue.update),
+                where: actionValue.where,
+              };
+            }
+          case "delete":
+            if (relationPermissions.delete === false) {
+              throw new Error("Not authorized");
+            } else if (relationPermissions.delete !== true && actionValue === true) {
+              return resolveWhere(relationPermissions.delete, context);
+            } else if (relationPermissions.delete !== true && actionValue !== true) {
+              return mergeWhere(actionValue, resolveWhere(relationPermissions.delete, context));
+            }
+            break;
           default:
             throw new Error("Not implemented");
         }
