@@ -98,90 +98,87 @@ export const createRlsExtension = (dmmf: BaseDMMF, permissionsConfig: Permission
           switch (operation) {
             case "findUnique":
             case "findUniqueOrThrow":
-              if (modelPermissions.read !== true || args.select || args.include) {
-                return query({
-                  ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  where: mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.read, context)),
-                });
-              }
-              break;
+              return query({
+                ...args,
+                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                where:
+                  modelPermissions.read === true
+                    ? args.where
+                    : mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.read, context)),
+              });
             case "findFirst":
             case "findFirstOrThrow":
             case "findMany":
-              if (modelPermissions.read !== true || args.select || args.include) {
-                return query({
-                  ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  where: mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.read, context)),
-                });
-              }
-              break;
+              return query({
+                ...args,
+                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                where:
+                  modelPermissions.read === true
+                    ? args.where
+                    : mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.read, context)),
+              });
             case "aggregate":
             case "count":
             case "groupBy":
-              if (modelPermissions.read !== true) {
-                return query({
-                  ...args,
-                  where: mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.read, context)),
-                });
-              }
-              break;
+              return query({
+                ...args,
+                where:
+                  modelPermissions.read === true
+                    ? args.where
+                    : mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.read, context)),
+              });
             case "create":
-              if (args.select || args.include || args.data) {
-                return query({
-                  ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  data: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.data as Record<string, any>),
-                });
-              }
-              break;
+              return query({
+                ...args,
+                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                data: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.data as Record<string, any>),
+              });
             case "update":
-              if (modelPermissions.update !== true || args.select || args.include || args.data) {
-                return query({
-                  ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  data: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.data as Record<string, any>),
-                  where: mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.update, context)),
-                });
-              }
-              break;
+              return query({
+                ...args,
+                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                data: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.data as Record<string, any>),
+                where:
+                  modelPermissions.update === true
+                    ? args.where
+                    : mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.update, context)),
+              });
             case "updateMany":
-              if (modelPermissions.update !== true || args.select || args.include) {
-                return query({
-                  ...args,
-                  where: mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.update, context)),
-                });
-              }
-              break;
+              return query({
+                ...args,
+                where:
+                  modelPermissions.update === true
+                    ? args.where
+                    : mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.update, context)),
+              });
             case "upsert":
-              if (modelPermissions.update !== true || args.select || args.include || args.data) {
-                return query({
-                  ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  create: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.create as Record<string, any>),
-                  update: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.update as Record<string, any>),
-                  where: mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.update, context)),
-                });
-              }
-              break;
+              return query({
+                ...args,
+                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                create: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.create as Record<string, any>),
+                update: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.update as Record<string, any>),
+                where:
+                  modelPermissions.update === true
+                    ? args.where
+                    : mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.update, context)),
+              });
             case "delete":
-              if (modelPermissions.delete !== true || args.select || args.include) {
-                return query({
-                  ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  where: mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.delete, context)),
-                });
-              }
-              break;
+              return query({
+                ...args,
+                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                where:
+                  modelPermissions.delete === true
+                    ? args.where
+                    : mergeWhereUnique(fieldsMap, modelName, args.where as Record<string, any>, resolveWhere(modelPermissions.delete, context)),
+              });
             case "deleteMany":
-              if (modelPermissions.delete !== true) {
-                return query({
-                  ...args,
-                  where: mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.delete, context)),
-                });
-              }
-              break;
+              return query({
+                ...args,
+                where:
+                  modelPermissions.delete === true
+                    ? args.where
+                    : mergeWhere(args.where as Record<string, any> | undefined, resolveWhere(modelPermissions.delete, context)),
+              });
           }
 
           return query(args);
