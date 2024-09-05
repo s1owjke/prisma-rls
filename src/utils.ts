@@ -115,7 +115,7 @@ const mergeRelationSelect = (
     const relationModelName = fieldDef.type;
     const relationPermissions = permissionsConfig[relationModelName];
 
-    if (relationPermissions.read === false) {
+    if (!relationPermissions.read) {
       return { where: generateImpossibleWhere(fieldsMap[modelName]) };
     } else if (relationPermissions.read !== true && selectValue === true) {
       return { where: resolveWhere(relationPermissions.read, context) };
@@ -168,7 +168,7 @@ export const mergeCreateData = (
       return mapValues(dataValue, (actionValue, actionName) => {
         switch (actionName) {
           case "create":
-            if (relationPermissions.create === false) {
+            if (!relationPermissions.create) {
               throw new Error("Not authorized");
             } else {
               return transformValue(actionValue, (value) => {
@@ -176,14 +176,14 @@ export const mergeCreateData = (
               });
             }
           case "createMany":
-            if (relationPermissions.create === false) {
+            if (!relationPermissions.create) {
               throw new Error("Not authorized");
             }
             break;
           case "connectOrCreate":
-            if (relationPermissions.create === false) {
+            if (!relationPermissions.create) {
               throw new Error("Not authorized");
-            } else if (relationPermissions.read === false) {
+            } else if (!relationPermissions.read) {
               return transformValue(actionValue, (value) => {
                 return {
                   create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, value.create),
@@ -206,7 +206,7 @@ export const mergeCreateData = (
               });
             }
           case "connect":
-            if (relationPermissions.read === false) {
+            if (!relationPermissions.read) {
               return transformValue(actionValue, (value) => {
                 return mergeWhereUnique(fieldsMap, relationModelName, value, generateImpossibleWhere(fieldsMap[relationModelName]));
               });
@@ -226,15 +226,15 @@ export const mergeCreateData = (
       return mapValues(dataValue, (actionValue, actionName) => {
         switch (actionName) {
           case "create":
-            if (relationPermissions.create === false) {
+            if (!relationPermissions.create) {
               throw new Error("Not authorized");
             } else {
               return mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue);
             }
           case "connectOrCreate":
-            if (relationPermissions.create === false) {
+            if (!relationPermissions.create) {
               throw new Error("Not authorized");
-            } else if (relationPermissions.read === false) {
+            } else if (!relationPermissions.read) {
               return {
                 create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue.create),
                 where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, generateImpossibleWhere(fieldsMap[relationModelName])),
@@ -251,7 +251,7 @@ export const mergeCreateData = (
               };
             }
           case "connect":
-            if (relationPermissions.read === false) {
+            if (!relationPermissions.read) {
               return mergeWhereUnique(fieldsMap, relationModelName, actionValue, generateImpossibleWhere(fieldsMap[relationModelName]));
             } else if (relationPermissions.read !== true) {
               return mergeWhereUnique(fieldsMap, relationModelName, actionValue, resolveWhere(relationPermissions.read, context));
@@ -287,7 +287,7 @@ export const mergeUpdateData = (
       return mapValues(dataValue, (actionValue, actionName) => {
         switch (actionName) {
           case "create":
-            if (relationPermissions.create === false) {
+            if (!relationPermissions.create) {
               throw new Error("Not authorized");
             } else {
               return transformValue(actionValue, (value) => {
@@ -295,14 +295,14 @@ export const mergeUpdateData = (
               });
             }
           case "createMany":
-            if (relationPermissions.create === false) {
+            if (!relationPermissions.create) {
               throw new Error("Not authorized");
             }
             break;
           case "connectOrCreate":
-            if (relationPermissions.create === false) {
+            if (!relationPermissions.create) {
               throw new Error("Not authorized");
-            } else if (relationPermissions.read === false) {
+            } else if (!relationPermissions.read) {
               return transformValue(actionValue, (value) => {
                 return {
                   create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, value.create),
@@ -327,7 +327,7 @@ export const mergeUpdateData = (
           case "set":
           case "connect":
           case "disconnect":
-            if (relationPermissions.read === false) {
+            if (!relationPermissions.read) {
               return transformValue(actionValue, (value) => {
                 return mergeWhereUnique(fieldsMap, relationModelName, value, generateImpossibleWhere(fieldsMap[relationModelName]));
               });
@@ -338,7 +338,7 @@ export const mergeUpdateData = (
             }
             break;
           case "update":
-            if (relationPermissions.update === false) {
+            if (!relationPermissions.update) {
               throw new Error("Not authorized");
             } else if (relationPermissions.update !== true) {
               return transformValue(actionValue, (value) => {
@@ -356,7 +356,7 @@ export const mergeUpdateData = (
               });
             }
           case "updateMany":
-            if (relationPermissions.update === false) {
+            if (!relationPermissions.update) {
               throw new Error("Not authorized");
             } else if (relationPermissions.update !== true) {
               return transformValue(actionValue, (value) => {
@@ -368,7 +368,7 @@ export const mergeUpdateData = (
             }
             break;
           case "upsert":
-            if (relationPermissions.create === false || relationPermissions.update === false) {
+            if (!relationPermissions.create || !relationPermissions.update) {
               throw new Error("Not authorized");
             } else if (relationPermissions.update !== true) {
               return transformValue(actionValue, (value) => {
@@ -388,7 +388,7 @@ export const mergeUpdateData = (
               });
             }
           case "delete":
-            if (relationPermissions.delete === false) {
+            if (!relationPermissions.delete) {
               throw new Error("Not authorized");
             } else if (relationPermissions.delete !== true) {
               return transformValue(actionValue, (value) => {
@@ -397,7 +397,7 @@ export const mergeUpdateData = (
             }
             break;
           case "deleteMany":
-            if (relationPermissions.delete === false) {
+            if (!relationPermissions.delete) {
               throw new Error("Not authorized");
             } else if (relationPermissions.delete !== true) {
               return transformValue(actionValue, (value) => {
@@ -413,15 +413,15 @@ export const mergeUpdateData = (
       return mapValues(dataValue, (actionValue, actionName) => {
         switch (actionName) {
           case "create":
-            if (relationPermissions.create === false) {
+            if (!relationPermissions.create) {
               throw new Error("Not authorized");
             } else {
               return mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue);
             }
           case "connectOrCreate":
-            if (relationPermissions.create === false) {
+            if (!relationPermissions.create) {
               throw new Error("Not authorized");
-            } else if (relationPermissions.read === false) {
+            } else if (!relationPermissions.read) {
               return {
                 create: mergeCreateData(permissionsConfig, context, fieldsMap, relationModelName, actionValue.create),
                 where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, generateImpossibleWhere(fieldsMap[relationModelName])),
@@ -438,14 +438,14 @@ export const mergeUpdateData = (
               };
             }
           case "connect":
-            if (relationPermissions.read === false) {
+            if (!relationPermissions.read) {
               return mergeWhereUnique(fieldsMap, relationModelName, actionValue, generateImpossibleWhere(fieldsMap[relationModelName]));
             } else if (relationPermissions.read !== true) {
               return mergeWhereUnique(fieldsMap, relationModelName, actionValue, resolveWhere(relationPermissions.read, context));
             }
             break;
           case "disconnect":
-            if (relationPermissions.read === false) {
+            if (!relationPermissions.read) {
               return mergeWhere(actionValue, generateImpossibleWhere(fieldsMap[relationModelName]));
             } else if (relationPermissions.read !== true && actionValue === true) {
               return resolveWhere(relationPermissions.read, context);
@@ -454,7 +454,7 @@ export const mergeUpdateData = (
             }
             break;
           case "update":
-            if (relationPermissions.update === false) {
+            if (!relationPermissions.update) {
               throw new Error("Not authorized");
             } else if (relationPermissions.update !== true) {
               return {
@@ -468,7 +468,7 @@ export const mergeUpdateData = (
               };
             }
           case "upsert":
-            if (relationPermissions.create === false || relationPermissions.update === false) {
+            if (!relationPermissions.create || !relationPermissions.update) {
               throw new Error("Not authorized");
             } else if (relationPermissions.update !== true) {
               return {
@@ -484,7 +484,7 @@ export const mergeUpdateData = (
               };
             }
           case "delete":
-            if (relationPermissions.delete === false) {
+            if (!relationPermissions.delete) {
               throw new Error("Not authorized");
             } else if (relationPermissions.delete !== true && actionValue === true) {
               return resolveWhere(relationPermissions.delete, context);
