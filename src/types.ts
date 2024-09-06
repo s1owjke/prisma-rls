@@ -6,8 +6,8 @@ export type PrismaTypeMap = {
 
 type PrismaModelName<TypeMap extends PrismaTypeMap> = keyof TypeMap["model"];
 
-export type PrismaModelWhere<TypeMap extends PrismaTypeMap, Model extends PrismaModelName<TypeMap>> = NonNullable<
-  TypeMap["model"][Model]["operations"]["findMany"]["args"]["where"]
+export type PrismaModelWhere<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>> = NonNullable<
+  TypeMap["model"][ModelName]["operations"]["findMany"]["args"]["where"]
 >;
 
 export type ModelPermissionsConfig<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>, Context extends unknown> = {
@@ -19,6 +19,13 @@ export type ModelPermissionsConfig<TypeMap extends PrismaTypeMap, ModelName exte
 
 export type PermissionsConfig<TypeMap extends PrismaTypeMap, Context extends unknown> = {
   [ModelName in PrismaModelName<TypeMap>]: ModelPermissionsConfig<TypeMap, ModelName, Context>;
+};
+
+export type AllOperationsArgs = {
+  operation: string;
+  model: string;
+  args: Record<string, any>;
+  query: (args: Record<string, any>) => Promise<unknown>;
 };
 
 export type FieldsMap = Record<string, Record<string, DMMF.Field>>;
