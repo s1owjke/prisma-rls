@@ -2,8 +2,9 @@ import { Prisma } from "@prisma/client/extension";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import type { BaseDMMF } from "@prisma/client/runtime/library";
 
-import { AllOperationsArgs, FieldsMap, PermissionsConfig, PrismaTypeMap } from "./types";
+import type { AllOperationsArgs, PrismaTypeMap, PermissionsConfig } from "./types";
 import {
+  buildFieldsMap,
   generateImpossibleWhere,
   mergeCreateData,
   mergeSelectAndInclude,
@@ -14,15 +15,7 @@ import {
 } from "./utils";
 
 export const createRlsExtension = (dmmf: BaseDMMF, permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>, context: unknown) => {
-  const fieldsMap: FieldsMap = {};
-
-  for (const model of dmmf.datamodel.models) {
-    fieldsMap[model.name] = {};
-
-    for (const field of model.fields) {
-      fieldsMap[model.name][field.name] = field;
-    }
-  }
+  const fieldsMap = buildFieldsMap(dmmf);
 
   return Prisma.defineExtension({
     name: "prisma-rls",
@@ -32,141 +25,139 @@ export const createRlsExtension = (dmmf: BaseDMMF, permissionsConfig: Permission
           const modelPermissions = permissionsConfig[modelName];
 
           switch (operationName) {
-            case "findFirst":
             case "findUnique":
-              if (!modelPermissions.read) {
-                return Promise.resolve(null);
-              }
-              break;
-            case "findFirstOrThrow":
             case "findUniqueOrThrow":
-              if (!modelPermissions.read) {
+              if (!modelPermissions.read && operationName === "findUnique") {
+                return Promise.resolve(null);
+              } else if (!modelPermissions && operationName === "findUniqueOrThrow") {
                 throw new PrismaClientKnownRequestError(`No ${modelName} found`, {
                   code: "P2025",
                   clientVersion: Prisma.prismaVersion.client,
                 });
+              } else {
+                return query({
+                  ...args,
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  where:
+                    modelPermissions.read === true
+                      ? args.where
+                      : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.read, context)),
+                });
               }
-              break;
+            case "findFirst":
+            case "findFirstOrThrow":
             case "findMany":
-              if (!modelPermissions.read) {
-                return Promise.resolve([]);
+              if (!modelPermissions.read && operationName === "findFirst") {
+                return Promise.resolve(null);
+              } else if (!modelPermissions && operationName === "findFirstOrThrow") {
+                throw new PrismaClientKnownRequestError(`No ${modelName} found`, {
+                  code: "P2025",
+                  clientVersion: Prisma.prismaVersion.client,
+                });
+              } else if (!modelPermissions.read && operationName === "findMany") {
+                return Promise.resolve(null);
+              } else {
+                return query({
+                  ...args,
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  where: modelPermissions.read === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.read, context)),
+                });
               }
-              break;
             case "aggregate":
-              if (!modelPermissions.read) {
+            case "count":
+            case "groupBy":
+              if (!modelPermissions.read && operationName === "aggregate") {
                 return query({
                   ...args,
                   where: generateImpossibleWhere(fieldsMap[modelName]),
                 });
-              }
-              break;
-            case "count":
-              if (!modelPermissions.read) {
+              } else if (!modelPermissions.read && operationName === "count") {
                 return Promise.resolve(0);
               }
-              break;
-            case "groupBy":
-              if (!modelPermissions.read) {
+              if (!modelPermissions.read && operationName === "groupBy") {
                 return Promise.resolve([]);
+              } else {
+                return query({
+                  ...args,
+                  where: modelPermissions.read === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.read, context)),
+                });
               }
-              break;
             case "create":
+              if (!modelPermissions.create) {
+                throw new Error("Not authorized");
+              } else {
+                return query({
+                  ...args,
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  data: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.data),
+                });
+              }
             case "createMany":
               if (!modelPermissions.create) {
                 throw new Error("Not authorized");
+              } else {
+                return query(args);
               }
-              break;
             case "update":
+              if (!modelPermissions.update) {
+                throw new Error("Not authorized");
+              } else {
+                return query({
+                  ...args,
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  data: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.data),
+                  where:
+                    modelPermissions.update === true
+                      ? args.where
+                      : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.update, context)),
+                });
+              }
             case "updateMany":
               if (!modelPermissions.update) {
                 throw new Error("Not authorized");
+              } else {
+                return query({
+                  ...args,
+                  where: modelPermissions.update === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.update, context)),
+                });
               }
-              break;
             case "upsert":
               if (!modelPermissions.create || !modelPermissions.update) {
                 throw new Error("Not authorized");
+              } else {
+                return query({
+                  ...args,
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  create: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.create),
+                  update: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.update),
+                  where:
+                    modelPermissions.update === true
+                      ? args.where
+                      : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.update, context)),
+                });
               }
-              break;
             case "delete":
+              if (!modelPermissions.delete) {
+                throw new Error("Not authorized");
+              } else {
+                return query({
+                  ...args,
+                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  where:
+                    modelPermissions.delete === true
+                      ? args.where
+                      : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.delete, context)),
+                });
+              }
             case "deleteMany":
               if (!modelPermissions.delete) {
                 throw new Error("Not authorized");
+              } else {
+                return query({
+                  ...args,
+                  where: modelPermissions.delete === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.delete, context)),
+                });
               }
-              break;
-          }
-
-          switch (operationName) {
-            case "findUnique":
-            case "findUniqueOrThrow":
-              return query({
-                ...args,
-                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                where:
-                  modelPermissions.read === true
-                    ? args.where
-                    : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.read, context)),
-              });
-            case "findFirst":
-            case "findFirstOrThrow":
-            case "findMany":
-              return query({
-                ...args,
-                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                where: modelPermissions.read === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.read, context)),
-              });
-            case "aggregate":
-            case "count":
-            case "groupBy":
-              return query({
-                ...args,
-                where: modelPermissions.read === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.read, context)),
-              });
-            case "create":
-              return query({
-                ...args,
-                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                data: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.data),
-              });
-            case "update":
-              return query({
-                ...args,
-                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                data: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.data),
-                where:
-                  modelPermissions.update === true
-                    ? args.where
-                    : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.update, context)),
-              });
-            case "updateMany":
-              return query({
-                ...args,
-                where: modelPermissions.update === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.update, context)),
-              });
-            case "upsert":
-              return query({
-                ...args,
-                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                create: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.create),
-                update: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.update),
-                where:
-                  modelPermissions.update === true
-                    ? args.where
-                    : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.update, context)),
-              });
-            case "delete":
-              return query({
-                ...args,
-                ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                where:
-                  modelPermissions.delete === true
-                    ? args.where
-                    : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.delete, context)),
-              });
-            case "deleteMany":
-              return query({
-                ...args,
-                where: modelPermissions.delete === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.delete, context)),
-              });
           }
 
           return query(args);

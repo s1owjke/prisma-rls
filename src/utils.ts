@@ -1,6 +1,19 @@
-import type { DMMF } from "@prisma/client/runtime/library";
+import type { BaseDMMF, DMMF } from "@prisma/client/runtime/library";
 
 import type { FieldsMap, PermissionsConfig, PrismaTypeMap } from "./types";
+
+export const buildFieldsMap = (dmmf: BaseDMMF): FieldsMap => {
+  const fieldsMap: FieldsMap = {};
+
+  for (const model of dmmf.datamodel.models) {
+    fieldsMap[model.name] = {};
+    for (const field of model.fields) {
+      fieldsMap[model.name][field.name] = field;
+    }
+  }
+
+  return fieldsMap;
+};
 
 const mapValues = <T extends Record<string, any>>(object: T, iteratee: (value: T[keyof T], key: keyof T) => T[keyof T]) => {
   return Object.fromEntries(Object.entries(object).map(([key, value]) => [key, iteratee(value, key)]));
