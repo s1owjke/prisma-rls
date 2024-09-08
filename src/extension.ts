@@ -13,8 +13,12 @@ import {
   resolveWhere,
 } from "./utils";
 
-export const createRlsExtension = ({ dmmf, permissionsConfig, context }: ExtensionOptions) => {
+export const createRlsExtension = ({ dmmf, permissionsConfig, context, authorizationError }: ExtensionOptions) => {
   const fieldsMap = buildFieldsMap(dmmf);
+
+  if (!authorizationError) {
+    authorizationError = new Error("Not authorized");
+  }
 
   return Prisma.defineExtension({
     name: "prisma-rls",
@@ -36,7 +40,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context }: Extensi
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
                   where:
                     modelPermissions.read === true
                       ? args.where
@@ -58,7 +62,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context }: Extensi
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
                   where: modelPermissions.read === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.read, context)),
                 });
               }
@@ -83,28 +87,28 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context }: Extensi
               }
             case "create":
               if (!modelPermissions.create) {
-                throw new Error("Not authorized");
+                throw authorizationError;
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  data: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.data),
+                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  data: mergeCreateData(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.data),
                 });
               }
             case "createMany":
               if (!modelPermissions.create) {
-                throw new Error("Not authorized");
+                throw authorizationError;
               } else {
                 return query(args);
               }
             case "update":
               if (!modelPermissions.update) {
-                throw new Error("Not authorized");
+                throw authorizationError;
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  data: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.data),
+                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  data: mergeUpdateData(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.data),
                   where:
                     modelPermissions.update === true
                       ? args.where
@@ -113,7 +117,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context }: Extensi
               }
             case "updateMany":
               if (!modelPermissions.update) {
-                throw new Error("Not authorized");
+                throw authorizationError;
               } else {
                 return query({
                   ...args,
@@ -122,13 +126,13 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context }: Extensi
               }
             case "upsert":
               if (!modelPermissions.create || !modelPermissions.update) {
-                throw new Error("Not authorized");
+                throw authorizationError;
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
-                  create: mergeCreateData(permissionsConfig, context, fieldsMap, modelName, args.create),
-                  update: mergeUpdateData(permissionsConfig, context, fieldsMap, modelName, args.update),
+                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  create: mergeCreateData(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.create),
+                  update: mergeUpdateData(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.update),
                   where:
                     modelPermissions.update === true
                       ? args.where
@@ -137,11 +141,11 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context }: Extensi
               }
             case "delete":
               if (!modelPermissions.delete) {
-                throw new Error("Not authorized");
+                throw authorizationError;
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, fieldsMap, modelName, args.select, args.include),
+                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
                   where:
                     modelPermissions.delete === true
                       ? args.where
@@ -150,7 +154,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context }: Extensi
               }
             case "deleteMany":
               if (!modelPermissions.delete) {
-                throw new Error("Not authorized");
+                throw authorizationError;
               } else {
                 return query({
                   ...args,

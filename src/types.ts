@@ -29,6 +29,7 @@ export type ExtensionOptions = {
   dmmf: BaseDMMF;
   permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>;
   context: unknown;
+  authorizationError?: Error;
 };
 
 export type AllOperationsArgs = {
