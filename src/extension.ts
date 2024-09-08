@@ -1,8 +1,7 @@
 import { Prisma } from "@prisma/client/extension";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import type { BaseDMMF } from "@prisma/client/runtime/library";
 
-import type { AllOperationsArgs, PrismaTypeMap, PermissionsConfig } from "./types";
+import type { AllOperationsArgs, ExtensionOptions } from "./types";
 import {
   buildFieldsMap,
   generateImpossibleWhere,
@@ -14,7 +13,7 @@ import {
   resolveWhere,
 } from "./utils";
 
-export const createRlsExtension = (dmmf: BaseDMMF, permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>, context: unknown) => {
+export const createRlsExtension = ({ dmmf, permissionsConfig, context }: ExtensionOptions) => {
   const fieldsMap = buildFieldsMap(dmmf);
 
   return Prisma.defineExtension({

@@ -30,11 +30,11 @@ const mergeObjectsDeep = (first: Record<string, unknown>, second: Record<string,
 };
 
 export const resolveDb = (overridePermissions: PartialPermissionsConfig<Prisma.TypeMap, null> = {}) => {
-  const rlsExtension = createRlsExtension(
-    Prisma.dmmf,
-    mergeObjectsDeep(denyPermissions, overridePermissions) as PermissionsConfig<Prisma.TypeMap, null>,
-    null,
-  );
+  const rlsExtension = createRlsExtension({
+    dmmf: Prisma.dmmf,
+    permissionsConfig: mergeObjectsDeep(denyPermissions, overridePermissions) as PermissionsConfig<Prisma.TypeMap, null>,
+    context: null,
+  });
 
   return new PrismaClient().$extends(rlsExtension) as unknown as PrismaClient;
 };
