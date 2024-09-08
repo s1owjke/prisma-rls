@@ -2,17 +2,17 @@
 
 [![Published on npm](https://img.shields.io/npm/v/prisma-rls?color=brightgreen)](https://www.npmjs.com/package/prisma-rls) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-> 🚧 The package is under active development, public api could be changed
+> 🚧 The package is currently under active development, so it's not recommended for production
 
-The classic approach to implementing Row-Level Security (RLS) requires a database with built-in support and writing row-level security policies for tables.
+Row-Level Security (RLS) traditionally requires databases with native support and custom security policies for each table.
 
-This library offers an alternative approach - an extension to the Prisma client that adds additional "where" clauses to all model queries. This approach doesn't require RLS support on the database side (for example, in MySQL).
+This library provides an alternative: a Prisma client extension that automatically adds "where" clauses to all model queries. This method works without database-side RLS support (e.g., in MySQL).
 
-It's important to keep in mind that this extension doesn't cover raw queries. In such cases, you should take care of it yourself or use classic approach.
+Note that this extension doesn't apply to raw queries. For those, you must handle them manually or choose database with built-in support.
 
-## How to use it
+## Quick start
 
-Define permissions for all models in your schema.
+Specify permissions for each model in your schema.
 
 ```typescript
 import { Prisma } from "@prisma/client";
@@ -37,7 +37,7 @@ export const Guest: RolePermissions = {
 }
 ```
 
-Extend the Prisma client with the rls extension.
+Extend the Prisma client with the RLS extension.
 
 ```typescript
 import { Prisma, PrismaClient } from "@prisma/client";
@@ -46,14 +46,19 @@ import { createRlsExtension } from "prisma-rls";
 import { Guest } from "./permissions/guest";
 
 const context: Context = {};
-const db = new PrismaClient().$extends(createRlsExtension(Prisma.dmmf, Guest, context));
+
+const db = new PrismaClient().$extends({ 
+  dmmf: Prisma.dmmf,
+  permissionsConfig: Guest,
+  context,
+});
 ```
 
-After that all requests except raw will be executed according to permissions
+After that all non-raw queries will be executed according to the defined permissions.
 
 ### Permissions registry
 
-Almost always you will have several roles, to describe them in a type-safe way use the following pattern:
+In most cases, you will have multiple roles. To define them in a type-safe manner, follow this pattern:
 
 ```typescript
 import { admin } from "./admin";
@@ -70,7 +75,7 @@ export const permissionsRegistry = {
 
 ### Context
 
-Since Prisma doesn't support context to pass data to the [extensions](https://www.prisma.io/docs/orm/prisma-client/client-extensions), you will typically extend the client per request (based on role associated with auth token):
+Since Prisma doesn't support passing context to [extensions](https://www.prisma.io/docs/orm/prisma-client/client-extensions), you will generally extend the client for each request, depending on the role associated with the auth token:
 
 ```typescript
 import { Prisma, PrismaClient } from "@prisma/client";
@@ -85,15 +90,20 @@ import { permissionsRegistry } from "./permissions";
 
   const resolveConext = (request: FastifyRequest) => {
     const role = resolveRole(request.headers.authorization);
-    const rolePermissions = permissionsRegistry[role];
 
-    return { db: prisma.$extends(createRlsExtension(Prisma.dmmf, rolePermissions, { role })) };
-  }
-  
-  server.get('/post/count', async function handler(request, reply) {
+    const rlsExtension = createRlsExtension({
+      dmmf: Prisma.dmmf,
+      permissionsConfig: permissionsRegistry[role],
+      context: null,
+    });
+
+    return { db: prisma.$extends(rlsExtension) };
+  };
+
+  server.get("/post/count", async function handler(request, reply) {
     const { db } = resolveContext(request);
     return await db.post.count();
-  })
+  });
 
   await server.listen({ port: 8080, host: "0.0.0.0" });
 })();
