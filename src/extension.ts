@@ -29,7 +29,7 @@ export const createRlsExtension = (dmmf: BaseDMMF, permissionsConfig: Permission
             case "findUniqueOrThrow":
               if (!modelPermissions.read && operationName === "findUnique") {
                 return Promise.resolve(null);
-              } else if (!modelPermissions && operationName === "findUniqueOrThrow") {
+              } else if (!modelPermissions.read && operationName === "findUniqueOrThrow") {
                 throw new PrismaClientKnownRequestError(`No ${modelName} found`, {
                   code: "P2025",
                   clientVersion: Prisma.prismaVersion.client,
@@ -49,13 +49,13 @@ export const createRlsExtension = (dmmf: BaseDMMF, permissionsConfig: Permission
             case "findMany":
               if (!modelPermissions.read && operationName === "findFirst") {
                 return Promise.resolve(null);
-              } else if (!modelPermissions && operationName === "findFirstOrThrow") {
+              } else if (!modelPermissions.read && operationName === "findFirstOrThrow") {
                 throw new PrismaClientKnownRequestError(`No ${modelName} found`, {
                   code: "P2025",
                   clientVersion: Prisma.prismaVersion.client,
                 });
               } else if (!modelPermissions.read && operationName === "findMany") {
-                return Promise.resolve(null);
+                return Promise.resolve([]);
               } else {
                 return query({
                   ...args,

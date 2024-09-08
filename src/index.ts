@@ -1,2 +1,2 @@
 export { createRlsExtension } from "./extension";
-export { PermissionsConfig, ModelPermissionsConfig, PrismaModelWhere } from "./types";
+export { ModelPermissionsConfig, PrismaModelWhere, PermissionsConfig } from "./types";

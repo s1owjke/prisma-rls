@@ -4,7 +4,7 @@ export type PrismaTypeMap = {
   model: Record<string, any>;
 };
 
-type PrismaModelName<TypeMap extends PrismaTypeMap> = keyof TypeMap["model"];
+export type PrismaModelName<TypeMap extends PrismaTypeMap> = keyof TypeMap["model"];
 
 export type PrismaModelWhere<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>> = NonNullable<
   TypeMap["model"][ModelName]["operations"]["findMany"]["args"]["where"]
