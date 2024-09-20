@@ -433,6 +433,8 @@ export const mergeUpdateData = (
           default:
             throw new Error("Not implemented");
         }
+
+        return actionValue;
       });
     } else {
       return mapValues(dataValue, (actionValue, actionName) => {
@@ -481,11 +483,23 @@ export const mergeUpdateData = (
           case "update":
             if (!relationPermissions.update) {
               throw authorizationError;
+            } else if (relationPermissions.update !== true && !actionValue.hasOwnProperty("data")) {
+              return {
+                data: mergeUpdateData(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue),
+                where: resolveWhere(relationPermissions.update, context),
+              };
+            } else if (relationPermissions.update !== true && !actionValue.where) {
+              return {
+                data: mergeUpdateData(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.data),
+                where: resolveWhere(relationPermissions.update, context),
+              };
             } else if (relationPermissions.update !== true) {
               return {
                 data: mergeUpdateData(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.data),
                 where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, resolveWhere(relationPermissions.update, context)),
               };
+            } else if (!actionValue.hasOwnProperty("data")) {
+              return mergeUpdateData(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue);
             } else {
               return {
                 data: mergeUpdateData(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.data),
@@ -495,6 +509,12 @@ export const mergeUpdateData = (
           case "upsert":
             if (!relationPermissions.create || !relationPermissions.update) {
               throw authorizationError;
+            } else if (relationPermissions.update !== true && !actionValue.where) {
+              return {
+                create: mergeCreateData(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
+                update: mergeUpdateData(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.update),
+                where: resolveWhere(relationPermissions.update, context),
+              };
             } else if (relationPermissions.update !== true) {
               return {
                 create: mergeCreateData(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
@@ -520,6 +540,8 @@ export const mergeUpdateData = (
           default:
             throw new Error("Not implemented");
         }
+
+        return actionValue;
       });
     }
   });
