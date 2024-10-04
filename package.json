@@ -1,6 +1,6 @@
 {
   "name": "prisma-rls",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Prisma client extension for row-level security on any database",
   "license": "MIT",
   "keywords": [
@@ -32,6 +32,7 @@
     "@types/jest": "^29.5.12",
     "@types/node": "^20.12.7",
     "jest": "^29.7.0",
+    "prettier": "^3.3.3",
     "prisma": "^5.18.0",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",

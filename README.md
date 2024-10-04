@@ -10,9 +10,15 @@ This library provides an alternative: a Prisma client extension that automatical
 
 Note that this extension doesn't apply to raw queries. For those, you must handle them manually or choose database with built-in support.
 
+## Edge cases
+
+One edge case currently known is 1-1 mandatory relationships, on the owner side (the side containing the foreign key). 
+
+Prisma does not generate filters for them (where [not supported](https://github.com/prisma/prisma/issues/15708)), as result we couldn't apply RLS filters. Currently, as a temporary solution, no additional "where" clauses are added here (otherwise it will cause an error).
+
 ## Quick start
 
-Specify permissions for each model in your schema.
+Specify permissions for each model in your schema:
 
 ```typescript
 import { Prisma } from "@prisma/client";
@@ -37,7 +43,7 @@ export const Guest: RolePermissions = {
 }
 ```
 
-Extend the Prisma client with the RLS extension.
+Extend the Prisma client with the RLS extension:
 
 ```typescript
 import { Prisma, PrismaClient } from "@prisma/client";

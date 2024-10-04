@@ -129,24 +129,43 @@ const mergeRelationSelect = (
     const relationModelName = fieldDef.type;
     const relationPermissions = permissionsConfig[relationModelName];
 
-    if (!relationPermissions.read) {
-      return { where: generateImpossibleWhere(fieldsMap[modelName]) };
-    } else if (relationPermissions.read !== true && selectValue === true) {
-      return { where: resolveWhere(relationPermissions.read, context) };
-    } else if (relationPermissions.read !== true && selectValue !== false) {
-      return {
-        ...selectValue,
-        ...mergeSelectAndInclude(
-          permissionsConfig,
-          context,
-          authorizationError,
-          fieldsMap,
-          relationModelName,
-          selectValue.select,
-          selectValue.include,
-        ),
-        where: mergeWhere(selectValue.where, resolveWhere(relationPermissions.read, context)),
-      };
+    if (fieldDef.isList) {
+      if (!relationPermissions.read) {
+        return { where: generateImpossibleWhere(fieldsMap[modelName]) };
+      } else if (relationPermissions.read !== true && selectValue === true) {
+        return { where: resolveWhere(relationPermissions.read, context) }; //
+      } else if (relationPermissions.read !== true && selectValue !== false) {
+        return {
+          ...selectValue,
+          ...mergeSelectAndInclude(
+            permissionsConfig,
+            context,
+            authorizationError,
+            fieldsMap,
+            relationModelName,
+            selectValue.select,
+            selectValue.include,
+          ),
+          where: mergeWhere(selectValue.where, resolveWhere(relationPermissions.read, context)),
+        };
+      }
+    } else {
+      const foreignKeys = fieldDef.relationFromFields?.map((relationFromField) => fieldsMap[modelName][relationFromField]) || [];
+
+      if (foreignKeys.every((foreignKey) => foreignKey.isRequired) && relationPermissions.read !== true && selectValue !== false) {
+        return {
+          ...selectValue,
+          ...mergeSelectAndInclude(
+            permissionsConfig,
+            context,
+            authorizationError,
+            fieldsMap,
+            relationModelName,
+            selectValue.select,
+            selectValue.include,
+          ),
+        };
+      }
     }
 
     return selectValue;
