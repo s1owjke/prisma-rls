@@ -10,107 +10,109 @@ This library provides an alternative: a Prisma client extension that automatical
 
 Note that this extension doesn't apply to raw queries. For those, you must handle them manually or choose database with built-in support.
 
-## Edge cases
-
-One edge case currently known is 1-1 mandatory relationships, on the owner side (the side containing the foreign key). 
-
-Prisma does not generate filters for them (where [not supported](https://github.com/prisma/prisma/issues/15708)), as result we couldn't apply RLS filters. Currently, as a temporary solution, no additional "where" clauses are added here (otherwise it will cause an error).
-
 ## Quick start
 
-Specify permissions for each model in your schema:
+Define shared types:
 
 ```typescript
-import { Prisma } from "@prisma/client";
+import { Prisma, User } from "@prisma/client";
 import { PermissionsConfig } from "prisma-rls";
 
-export type Context = Record<string, any>;
-type RolePermissions = PermissionsConfig<Prisma.TypeMap, Context>;
+export type Role = "User" | "Guest";
+export type PermissionsContext = { user: User | null };
+export type RolePermissions = PermissionsConfig<Prisma.TypeMap, PermissionsContext>;
+export type PermissionsRegistry = Record<Role, RolePermissions>;
+```
 
-export const Guest: RolePermissions = {
+Define permissions for each model in your schema, they also can be a function:
+
+```typescript
+import { RolePermissions } from "./types";
+
+export const User: RolePermissions = {
   Post: {
     read: { published: { equals: true } },
-    create: false,
-    update: false,
-    delete: false,
+    create: true,
+    update: (permissionContext) => ({
+      author: {
+        id: { equals: permissionContext.user.id },
+      },
+    }),
+    delete: (permissionContext) => ({
+      author: {
+        id: { equals: permissionContext.user.id },
+      },
+    }),
   },
   User: {
-    read: { role: { not: { equals: "admin" } } },
+    read: (permissionContext) => ({
+      id: { equals: permissionContext.user.id },
+    }),
     create: false,
-    update: false,
+    update: (permissionContext) => ({
+      id: { equals: permissionContext.user.id },
+    }),
     delete: false,
   },
 }
 ```
 
-Extend the Prisma client with the RLS extension:
-
-```typescript
-import { Prisma, PrismaClient } from "@prisma/client";
-import { createRlsExtension } from "prisma-rls";
-
-import { Guest } from "./permissions/guest";
-
-const context: Context = {};
-
-const db = new PrismaClient().$extends({ 
-  dmmf: Prisma.dmmf,
-  permissionsConfig: Guest,
-  context,
-});
-```
-
-After that all non-raw queries will be executed according to the defined permissions.
-
-### Permissions registry
-
 In most cases, you will have multiple roles. To define them in a type-safe manner, follow this pattern:
 
 ```typescript
-import { admin } from "./admin";
 import { guest } from "./guest";
-
-type Role = "Admin" | "Guest";
-type PermissionsRegistry = Record<Role, RolePermissions>;
+import { user } from "./user";
+import { PermissionsRegistry } from "./types";
 
 export const permissionsRegistry = {
-  Admin: admin,
+  User: user,
   Guest: guest,
 } satisfies PermissionsRegistry;
 ```
 
-### Context
-
-Since Prisma doesn't support passing context to [extensions](https://www.prisma.io/docs/orm/prisma-client/client-extensions), you will generally extend the client for each request, depending on the role associated with the auth token:
+Prisma extensions don't support dynamic contexts, so create an extension per context:
 
 ```typescript
 import { Prisma, PrismaClient } from "@prisma/client";
 import Fastify, { FastifyRequest } from "fastify";
 import { createRlsExtension } from "prisma-rls";
 
-import { permissionsRegistry } from "./permissions";
+import { permissionsRegistry, PermissionsContext } from "./permissions";
 
 (async () => {
   const prisma = new PrismaClient();
   const server = Fastify();
 
-  const resolveConext = (request: FastifyRequest) => {
-    const role = resolveRole(request.headers.authorization);
+  const resolveDb = async (request: FastifyRequest) => {
+    const user = await resolveUser(request.headers.authorization);
+    const userRole = user ? user.role : "Guest";
+    
+    const permissionsContext: PermissionsContext = { user };
 
     const rlsExtension = createRlsExtension({
       dmmf: Prisma.dmmf,
-      permissionsConfig: permissionsRegistry[role],
-      context: null,
+      permissionsConfig: permissionsRegistry[userRole],
+      context: permissionsContext,
     });
 
     return { db: prisma.$extends(rlsExtension) };
   };
 
-  server.get("/post/count", async function handler(request, reply) {
-    const { db } = resolveContext(request);
-    return await db.post.count();
+  server.get("/user/list", async function handler(request, reply) {
+    const { db } = resolveRequestConext(request);
+    return await db.user.findMany();
   });
 
   await server.listen({ port: 8080, host: "0.0.0.0" });
 })();
 ```
+
+After that, all non-raw queries will be executed according to the defined permissions.
+
+## Edge cases
+
+A known edge case involves one-to-one mandatory relationships on the owner side (the entity containing the foreign key).
+
+Prisma [doesn't generate](https://github.com/prisma/prisma/issues/15708) filters in that case due to potential referential integrity violations, which could lead to inconsistent query results.
+
+As a temporary solution, because we can't apply RLS filters in this case, no additional "where" clauses are added. Please handle this at the policy level.
