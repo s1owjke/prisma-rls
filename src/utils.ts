@@ -15,12 +15,12 @@ export const buildFieldsMap = (dmmf: BaseDMMF): FieldsMap => {
   return fieldsMap;
 };
 
-const mapValues = <T extends Record<string, any>>(object: T, iteratee: (value: T[keyof T], key: keyof T) => T[keyof T]) => {
-  return Object.fromEntries(Object.entries(object).map(([key, value]) => [key, iteratee(value, key)]));
+const mapValues = async <T extends Record<string, any>>(object: T, iteratee: (value: T[keyof T], key: keyof T) => Promise<T[keyof T]>) => {
+  return Object.fromEntries(await Promise.all(Object.entries(object).map(async ([key, value]) => [key, await iteratee(value, key)])));
 };
 
-const transformValue = <T extends any>(value: T | T[], callback: (value: T) => T) => {
-  return Array.isArray(value) ? value.map(callback) : callback(value);
+const transformValue = <T extends any>(value: T | T[], callback: (value: T) => Promise<T>) => {
+  return Array.isArray(value) ? Promise.all(value.map(callback)) : callback(value);
 };
 
 export const generateImpossibleWhere = (fields: Record<string, DMMF.Field>): Record<string, any> => {
@@ -78,12 +78,12 @@ const mergeWhereUnique = (
   return { ...unique, AND: [rest, second] };
 };
 
-const generateModelRelationsCount = (
+const generateModelRelationsCount = async (
   permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>,
   context: unknown,
   fieldsMap: FieldsMap,
   modelName: string,
-): Record<string, any> => {
+): Promise<Record<string, any>> => {
   const select: Record<string, any> = {};
 
   for (const [fieldName, fieldDef] of Object.entries(fieldsMap[modelName])) {
@@ -91,21 +91,21 @@ const generateModelRelationsCount = (
       const relationModelName = fieldDef.type;
       const relationPermissions = permissionsConfig[relationModelName];
 
-      select[fieldName] = { where: resolvePermissionDefinition(relationPermissions.read, context) };
+      select[fieldName] = { where: await resolvePermissionDefinition(relationPermissions.read, context) };
     }
   }
 
   return select;
 };
 
-const resolvePermissionDefinition = (
+const resolvePermissionDefinition = async (
   permissionDefinition: boolean | Record<string, any> | ((context: unknown) => Record<string, any>),
   context: unknown,
-): Record<string, any> => {
-  return typeof permissionDefinition === "function" ? permissionDefinition(context) : permissionDefinition;
+): Promise<Record<string, any>> => {
+  return typeof permissionDefinition === "function" ? await permissionDefinition(context) : permissionDefinition;
 };
 
-export const resolveWhere = (
+export const resolveWhere = async (
   permissionDefinition: boolean | Record<string, any> | ((context: unknown) => Record<string, any>),
   context: unknown,
   fieldsMap: FieldsMap,
@@ -117,11 +117,11 @@ export const resolveWhere = (
   } else if (permissionDefinition === true) {
     return where;
   } else {
-    return mergeWhere(where, resolvePermissionDefinition(permissionDefinition, context));
+    return mergeWhere(where, await resolvePermissionDefinition(permissionDefinition, context));
   }
 };
 
-export const resolveWhereUnique = (
+export const resolveWhereUnique = async (
   permissionDefinition: boolean | Record<string, any> | ((context: unknown) => Record<string, any>),
   context: unknown,
   fieldsMap: FieldsMap,
@@ -133,24 +133,24 @@ export const resolveWhereUnique = (
   } else if (permissionDefinition === true) {
     return whereUnique;
   } else {
-    return mergeWhereUnique(fieldsMap, modelName, whereUnique, resolvePermissionDefinition(permissionDefinition, context));
+    return mergeWhereUnique(fieldsMap, modelName, whereUnique, await resolvePermissionDefinition(permissionDefinition, context));
   }
 };
 
-const resolveRelationSelect = (
+const resolveRelationSelect = async (
   permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>,
   context: unknown,
   authorizationError: Error,
   fieldsMap: FieldsMap,
   modelName: string,
   select: Record<string, any>,
-): Record<string, any> => {
-  return mapValues(select, (selectValue, selectName) => {
+): Promise<Record<string, any>> => {
+  return mapValues(select, async (selectValue, selectName) => {
     if (selectName === "_count") {
       if (selectValue === true) {
         return { select: generateModelRelationsCount(permissionsConfig, context, fieldsMap, modelName) };
       } else if (selectValue !== false && selectValue.select) {
-        return { select: resolveRelationSelect(permissionsConfig, context, authorizationError, fieldsMap, modelName, selectValue.select) };
+        return { select: await resolveRelationSelect(permissionsConfig, context, authorizationError, fieldsMap, modelName, selectValue.select) };
       } else {
         return selectValue;
       }
@@ -168,11 +168,10 @@ const resolveRelationSelect = (
       if (!relationPermissions.read) {
         return { where: generateImpossibleWhere(fieldsMap[modelName]) };
       } else if (relationPermissions.read !== true && selectValue === true) {
-        return { where: resolvePermissionDefinition(relationPermissions.read, context) }; //
+        return { where: await resolvePermissionDefinition(relationPermissions.read, context) }; //
       } else if (relationPermissions.read !== true && selectValue !== false) {
-        return {
-          ...selectValue,
-          ...resolveSelectAndInclude(
+        const [selectAndInclude, permissionDefinition] = await Promise.all([
+          resolveSelectAndInclude(
             permissionsConfig,
             context,
             authorizationError,
@@ -181,7 +180,13 @@ const resolveRelationSelect = (
             selectValue.select,
             selectValue.include,
           ),
-          where: mergeWhere(selectValue.where, resolvePermissionDefinition(relationPermissions.read, context)),
+          resolvePermissionDefinition(relationPermissions.read, context),
+        ]);
+
+        return {
+          ...selectValue,
+          ...selectAndInclude,
+          where: mergeWhere(selectValue.where, permissionDefinition),
         };
       }
     } else {
@@ -190,7 +195,7 @@ const resolveRelationSelect = (
       if (foreignKeys.every((foreignKey) => foreignKey.isRequired) && relationPermissions.read !== true && selectValue !== false) {
         return {
           ...selectValue,
-          ...resolveSelectAndInclude(
+          ...(await resolveSelectAndInclude(
             permissionsConfig,
             context,
             authorizationError,
@@ -198,7 +203,7 @@ const resolveRelationSelect = (
             relationModelName,
             selectValue.select,
             selectValue.include,
-          ),
+          )),
         };
       }
     }
@@ -207,7 +212,7 @@ const resolveRelationSelect = (
   });
 };
 
-export const resolveSelectAndInclude = (
+export const resolveSelectAndInclude = async (
   permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>,
   context: unknown,
   authorizationError: Error,
@@ -215,25 +220,25 @@ export const resolveSelectAndInclude = (
   modelName: string,
   select: Record<string, any> | undefined,
   include: Record<string, any> | undefined,
-): Record<string, any> => {
+): Promise<Record<string, any>> => {
   if (select) {
-    return { select: resolveRelationSelect(permissionsConfig, context, authorizationError, fieldsMap, modelName, select) };
+    return { select: await resolveRelationSelect(permissionsConfig, context, authorizationError, fieldsMap, modelName, select) };
   } else if (include) {
-    return { include: resolveRelationSelect(permissionsConfig, context, authorizationError, fieldsMap, modelName, include) };
+    return { include: await resolveRelationSelect(permissionsConfig, context, authorizationError, fieldsMap, modelName, include) };
   } else {
     return {};
   }
 };
 
-export const resolveCreate = (
+export const resolveCreate = async (
   permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>,
   context: unknown,
   authorizationError: Error,
   fieldsMap: FieldsMap,
   modelName: string,
   data: Record<string, any>,
-): Record<string, any> => {
-  return mapValues(data, (dataValue, dataName) => {
+): Promise<Record<string, any>> => {
+  return mapValues(data, async (dataValue, dataName) => {
     const fieldDef = fieldsMap[modelName][dataName];
     if (fieldDef.kind !== "object") {
       return dataValue;
@@ -243,13 +248,13 @@ export const resolveCreate = (
     const relationPermissions = permissionsConfig[relationModelName];
 
     if (fieldDef.isList) {
-      return mapValues(dataValue, (actionValue, actionName) => {
+      return mapValues(dataValue, async (actionValue, actionName) => {
         switch (actionName) {
           case "create":
             if (!relationPermissions.create) {
               throw authorizationError;
             } else {
-              return transformValue(actionValue, (value) => {
+              return transformValue(actionValue, async (value) => {
                 return resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value);
               });
             }
@@ -262,35 +267,37 @@ export const resolveCreate = (
             if (!relationPermissions.create) {
               throw authorizationError;
             } else if (!relationPermissions.read) {
-              return transformValue(actionValue, (value) => {
+              return transformValue(actionValue, async (value) => {
                 return {
-                  create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
+                  create: await resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
                   where: mergeWhereUnique(fieldsMap, relationModelName, value.where, generateImpossibleWhere(fieldsMap[relationModelName])),
                 };
               });
             } else if (relationPermissions.read !== true) {
-              return transformValue(actionValue, (value) => {
-                return {
-                  create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
-                  where: mergeWhereUnique(fieldsMap, relationModelName, value.where, resolvePermissionDefinition(relationPermissions.read, context)),
-                };
+              return transformValue(actionValue, async (value) => {
+                const [create, permissionDefinition] = await Promise.all([
+                  resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
+                  resolvePermissionDefinition(relationPermissions.read, context),
+                ]);
+
+                return { create, where: mergeWhereUnique(fieldsMap, relationModelName, value.where, permissionDefinition) };
               });
             } else {
-              return transformValue(actionValue, (value) => {
+              return transformValue(actionValue, async (value) => {
                 return {
-                  create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value),
+                  create: await resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value),
                   where: value.where,
                 };
               });
             }
           case "connect":
             if (!relationPermissions.read) {
-              return transformValue(actionValue, (value) => {
+              return transformValue(actionValue, async (value) => {
                 return mergeWhereUnique(fieldsMap, relationModelName, value, generateImpossibleWhere(fieldsMap[relationModelName]));
               });
             } else if (relationPermissions.read !== true) {
-              return transformValue(actionValue, (value) => {
-                return mergeWhereUnique(fieldsMap, relationModelName, value, resolvePermissionDefinition(relationPermissions.read, context));
+              return transformValue(actionValue, async (value) => {
+                return mergeWhereUnique(fieldsMap, relationModelName, value, await resolvePermissionDefinition(relationPermissions.read, context));
               });
             }
             break;
@@ -301,7 +308,7 @@ export const resolveCreate = (
         return actionValue;
       });
     } else {
-      return mapValues(dataValue, (actionValue, actionName) => {
+      return mapValues(dataValue, async (actionValue, actionName) => {
         switch (actionName) {
           case "create":
             if (!relationPermissions.create) {
@@ -314,22 +321,19 @@ export const resolveCreate = (
               throw authorizationError;
             } else if (!relationPermissions.read) {
               return {
-                create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
+                create: await resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
                 where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, generateImpossibleWhere(fieldsMap[relationModelName])),
               };
             } else if (relationPermissions.read !== true) {
-              return {
-                create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
-                where: mergeWhereUnique(
-                  fieldsMap,
-                  relationModelName,
-                  actionValue.where,
-                  resolvePermissionDefinition(relationPermissions.read, context),
-                ),
-              };
+              const [create, permissionDefinition] = await Promise.all([
+                resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
+                resolvePermissionDefinition(relationPermissions.read, context),
+              ]);
+
+              return { create, where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, permissionDefinition) };
             } else {
               return {
-                create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
+                create: await resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
                 where: actionValue.where,
               };
             }
@@ -337,7 +341,12 @@ export const resolveCreate = (
             if (!relationPermissions.read) {
               return mergeWhereUnique(fieldsMap, relationModelName, actionValue, generateImpossibleWhere(fieldsMap[relationModelName]));
             } else if (relationPermissions.read !== true) {
-              return mergeWhereUnique(fieldsMap, relationModelName, actionValue, resolvePermissionDefinition(relationPermissions.read, context));
+              return mergeWhereUnique(
+                fieldsMap,
+                relationModelName,
+                actionValue,
+                await resolvePermissionDefinition(relationPermissions.read, context),
+              );
             }
             break;
           default:
@@ -350,15 +359,15 @@ export const resolveCreate = (
   });
 };
 
-export const resolveUpdate = (
+export const resolveUpdate = async (
   permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>,
   context: unknown,
   authorizationError: Error,
   fieldsMap: FieldsMap,
   modelName: string,
   data: Record<string, any>,
-): Record<string, any> => {
-  return mapValues(data, (dataValue, dataName) => {
+): Promise<Record<string, any>> => {
+  return mapValues(data, async (dataValue, dataName) => {
     const fieldDef = fieldsMap[modelName][dataName];
     if (fieldDef.kind !== "object") {
       return dataValue;
@@ -368,13 +377,13 @@ export const resolveUpdate = (
     const relationPermissions = permissionsConfig[relationModelName];
 
     if (fieldDef.isList) {
-      return mapValues(dataValue, (actionValue, actionName) => {
+      return mapValues(dataValue, async (actionValue, actionName) => {
         switch (actionName) {
           case "create":
             if (!relationPermissions.create) {
               throw authorizationError;
             } else {
-              return transformValue(actionValue, (value) => {
+              return transformValue(actionValue, async (value) => {
                 return resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value);
               });
             }
@@ -387,23 +396,25 @@ export const resolveUpdate = (
             if (!relationPermissions.create) {
               throw authorizationError;
             } else if (!relationPermissions.read) {
-              return transformValue(actionValue, (value) => {
+              return transformValue(actionValue, async (value) => {
                 return {
-                  create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
+                  create: await resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
                   where: mergeWhereUnique(fieldsMap, relationModelName, value.where, generateImpossibleWhere(fieldsMap[relationModelName])),
                 };
               });
             } else if (relationPermissions.read !== true) {
-              return transformValue(actionValue, (value) => {
-                return {
-                  create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
-                  where: mergeWhereUnique(fieldsMap, relationModelName, value.where, resolvePermissionDefinition(relationPermissions.read, context)),
-                };
+              return transformValue(actionValue, async (value) => {
+                const [create, permissionDefinition] = await Promise.all([
+                  resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
+                  resolvePermissionDefinition(relationPermissions.read, context),
+                ]);
+
+                return { create, where: mergeWhereUnique(fieldsMap, relationModelName, value.where, permissionDefinition) };
               });
             } else {
-              return transformValue(actionValue, (value) => {
+              return transformValue(actionValue, async (value) => {
                 return {
-                  create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
+                  create: await resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
                   where: value.where,
                 };
               });
@@ -412,12 +423,12 @@ export const resolveUpdate = (
           case "connect":
           case "disconnect":
             if (!relationPermissions.read) {
-              return transformValue(actionValue, (value) => {
+              return transformValue(actionValue, async (value) => {
                 return mergeWhereUnique(fieldsMap, relationModelName, value, generateImpossibleWhere(fieldsMap[relationModelName]));
               });
             } else if (relationPermissions.read !== true) {
-              return transformValue(actionValue, (value) => {
-                return mergeWhereUnique(fieldsMap, relationModelName, value, resolvePermissionDefinition(relationPermissions.read, context));
+              return transformValue(actionValue, async (value) => {
+                return mergeWhereUnique(fieldsMap, relationModelName, value, await resolvePermissionDefinition(relationPermissions.read, context));
               });
             }
             break;
@@ -425,21 +436,18 @@ export const resolveUpdate = (
             if (!relationPermissions.update) {
               throw authorizationError;
             } else if (relationPermissions.update !== true) {
-              return transformValue(actionValue, (value) => {
-                return {
-                  data: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.data),
-                  where: mergeWhereUnique(
-                    fieldsMap,
-                    relationModelName,
-                    value.where,
-                    resolvePermissionDefinition(relationPermissions.update, context),
-                  ),
-                };
+              return transformValue(actionValue, async (value) => {
+                const [data, permissionDefinition] = await Promise.all([
+                  resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.data),
+                  resolvePermissionDefinition(relationPermissions.update, context),
+                ]);
+
+                return { data, where: mergeWhereUnique(fieldsMap, relationModelName, value.where, permissionDefinition) };
               });
             } else {
-              return transformValue(actionValue, (value) => {
+              return transformValue(actionValue, async (value) => {
                 return {
-                  data: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.data),
+                  data: await resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.data),
                   where: value.where,
                 };
               });
@@ -448,10 +456,10 @@ export const resolveUpdate = (
             if (!relationPermissions.update) {
               throw authorizationError;
             } else if (relationPermissions.update !== true) {
-              return transformValue(actionValue, (value) => {
+              return transformValue(actionValue, async (value) => {
                 return {
                   data: value.data,
-                  where: mergeWhere(value.where, resolvePermissionDefinition(relationPermissions.update, context)),
+                  where: mergeWhere(value.where, await resolvePermissionDefinition(relationPermissions.update, context)),
                 };
               });
             }
@@ -460,33 +468,31 @@ export const resolveUpdate = (
             if (!relationPermissions.create || !relationPermissions.update) {
               throw authorizationError;
             } else if (relationPermissions.update !== true) {
-              return transformValue(actionValue, (value) => {
-                return {
-                  create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
-                  update: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.update),
-                  where: mergeWhereUnique(
-                    fieldsMap,
-                    relationModelName,
-                    value.where,
-                    resolvePermissionDefinition(relationPermissions.update, context),
-                  ),
-                };
+              return transformValue(actionValue, async (value) => {
+                const [create, update, permissionDefinition] = await Promise.all([
+                  resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
+                  resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.update),
+                  resolvePermissionDefinition(relationPermissions.update, context),
+                ]);
+
+                return { create, update, where: mergeWhereUnique(fieldsMap, relationModelName, value.where, permissionDefinition) };
               });
             } else {
-              return transformValue(actionValue, (value) => {
-                return {
-                  create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
-                  update: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.update),
-                  where: value.where,
-                };
+              return transformValue(actionValue, async (value) => {
+                const [create, update] = await Promise.all([
+                  resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.create),
+                  resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, value.update),
+                ]);
+
+                return { create, update, where: value.where };
               });
             }
           case "delete":
             if (!relationPermissions.delete) {
               throw authorizationError;
             } else if (relationPermissions.delete !== true) {
-              return transformValue(actionValue, (value) => {
-                return mergeWhereUnique(fieldsMap, relationModelName, value, resolvePermissionDefinition(relationPermissions.delete, context));
+              return transformValue(actionValue, async (value) => {
+                return mergeWhereUnique(fieldsMap, relationModelName, value, await resolvePermissionDefinition(relationPermissions.delete, context));
               });
             }
             break;
@@ -494,8 +500,8 @@ export const resolveUpdate = (
             if (!relationPermissions.delete) {
               throw authorizationError;
             } else if (relationPermissions.delete !== true) {
-              return transformValue(actionValue, (value) => {
-                return mergeWhere(value, resolvePermissionDefinition(relationPermissions.delete, context));
+              return transformValue(actionValue, async (value) => {
+                return mergeWhere(value, await resolvePermissionDefinition(relationPermissions.delete, context));
               });
             }
             break;
@@ -506,7 +512,7 @@ export const resolveUpdate = (
         return actionValue;
       });
     } else {
-      return mapValues(dataValue, (actionValue, actionName) => {
+      return mapValues(dataValue, async (actionValue, actionName) => {
         switch (actionName) {
           case "create":
             if (!relationPermissions.create) {
@@ -519,22 +525,19 @@ export const resolveUpdate = (
               throw authorizationError;
             } else if (!relationPermissions.read) {
               return {
-                create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
+                create: await resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
                 where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, generateImpossibleWhere(fieldsMap[relationModelName])),
               };
             } else if (relationPermissions.read !== true) {
-              return {
-                create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
-                where: mergeWhereUnique(
-                  fieldsMap,
-                  relationModelName,
-                  actionValue.where,
-                  resolvePermissionDefinition(relationPermissions.read, context),
-                ),
-              };
+              const [create, permissionDefinition] = await Promise.all([
+                resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
+                resolvePermissionDefinition(relationPermissions.read, context),
+              ]);
+
+              return { create, where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, permissionDefinition) };
             } else {
               return {
-                create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
+                create: await resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
                 where: actionValue.where,
               };
             }
@@ -542,7 +545,12 @@ export const resolveUpdate = (
             if (!relationPermissions.read) {
               return mergeWhereUnique(fieldsMap, relationModelName, actionValue, generateImpossibleWhere(fieldsMap[relationModelName]));
             } else if (relationPermissions.read !== true) {
-              return mergeWhereUnique(fieldsMap, relationModelName, actionValue, resolvePermissionDefinition(relationPermissions.read, context));
+              return mergeWhereUnique(
+                fieldsMap,
+                relationModelName,
+                actionValue,
+                await resolvePermissionDefinition(relationPermissions.read, context),
+              );
             }
             break;
           case "disconnect":
@@ -551,37 +559,38 @@ export const resolveUpdate = (
             } else if (relationPermissions.read !== true && actionValue === true) {
               return resolvePermissionDefinition(relationPermissions.read, context);
             } else if (relationPermissions.read !== true && actionValue !== true) {
-              return mergeWhere(actionValue, resolvePermissionDefinition(relationPermissions.read, context));
+              return mergeWhere(actionValue, await resolvePermissionDefinition(relationPermissions.read, context));
             }
             break;
           case "update":
             if (!relationPermissions.update) {
               throw authorizationError;
             } else if (relationPermissions.update !== true && !actionValue.hasOwnProperty("data")) {
-              return {
-                data: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue),
-                where: resolvePermissionDefinition(relationPermissions.update, context),
-              };
+              const [data, where] = await Promise.all([
+                resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue),
+                resolvePermissionDefinition(relationPermissions.update, context),
+              ]);
+
+              return { data, where };
             } else if (relationPermissions.update !== true && !actionValue.where) {
-              return {
-                data: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.data),
-                where: resolvePermissionDefinition(relationPermissions.update, context),
-              };
+              const [data, where] = await Promise.all([
+                resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.data),
+                resolvePermissionDefinition(relationPermissions.update, context),
+              ]);
+
+              return { data, where };
             } else if (relationPermissions.update !== true) {
-              return {
-                data: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.data),
-                where: mergeWhereUnique(
-                  fieldsMap,
-                  relationModelName,
-                  actionValue.where,
-                  resolvePermissionDefinition(relationPermissions.update, context),
-                ),
-              };
+              const [data, permissionDefinition] = await Promise.all([
+                resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.data),
+                resolvePermissionDefinition(relationPermissions.update, context),
+              ]);
+
+              return { data, where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, permissionDefinition) };
             } else if (!actionValue.hasOwnProperty("data")) {
               return resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue);
             } else {
               return {
-                data: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.data),
+                data: await resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.data),
                 where: actionValue.where,
               };
             }
@@ -589,28 +598,28 @@ export const resolveUpdate = (
             if (!relationPermissions.create || !relationPermissions.update) {
               throw authorizationError;
             } else if (relationPermissions.update !== true && !actionValue.where) {
-              return {
-                create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
-                update: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.update),
-                where: resolvePermissionDefinition(relationPermissions.update, context),
-              };
+              const [create, update, where] = await Promise.all([
+                resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
+                resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.update),
+                resolvePermissionDefinition(relationPermissions.update, context),
+              ]);
+
+              return { create, update, where };
             } else if (relationPermissions.update !== true) {
-              return {
-                create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
-                update: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.update),
-                where: mergeWhereUnique(
-                  fieldsMap,
-                  relationModelName,
-                  actionValue.where,
-                  resolvePermissionDefinition(relationPermissions.update, context),
-                ),
-              };
+              const [create, update, permissionDefinition] = await Promise.all([
+                resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
+                resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.update),
+                resolvePermissionDefinition(relationPermissions.update, context),
+              ]);
+
+              return { create, update, where: mergeWhereUnique(fieldsMap, relationModelName, actionValue.where, permissionDefinition) };
             } else {
-              return {
-                create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
-                update: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.update),
-                where: actionValue.where,
-              };
+              const [create, update] = await Promise.all([
+                resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.create),
+                resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, relationModelName, actionValue.update),
+              ]);
+
+              return { create, update, where: actionValue.where };
             }
           case "delete":
             if (!relationPermissions.delete) {
@@ -618,7 +627,7 @@ export const resolveUpdate = (
             } else if (relationPermissions.delete !== true && actionValue === true) {
               return resolvePermissionDefinition(relationPermissions.delete, context);
             } else if (relationPermissions.delete !== true && actionValue !== true) {
-              return mergeWhere(actionValue, resolvePermissionDefinition(relationPermissions.delete, context));
+              return mergeWhere(actionValue, await resolvePermissionDefinition(relationPermissions.delete, context));
             }
             break;
           default:

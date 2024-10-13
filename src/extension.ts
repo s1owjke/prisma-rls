@@ -23,7 +23,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
     name: "prisma-rls",
     query: {
       $allModels: {
-        $allOperations({ model: modelName, operation: operationName, args, query }: AllOperationsArgs) {
+        async $allOperations({ model: modelName, operation: operationName, args, query }: AllOperationsArgs) {
           const modelPermissions = permissionsConfig[modelName];
 
           switch (operationName) {
@@ -37,11 +37,12 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
                   clientVersion: Prisma.prismaVersion.client,
                 });
               } else {
-                return query({
-                  ...args,
-                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  where: resolveWhereUnique(modelPermissions.read, context, fieldsMap, modelName, args.where),
-                });
+                const [selectAndInclude, where] = await Promise.all([
+                  resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  resolveWhereUnique(modelPermissions.read, context, fieldsMap, modelName, args.where),
+                ]);
+
+                return query({ ...args, ...selectAndInclude, where });
               }
             case "findFirst":
             case "findFirstOrThrow":
@@ -56,11 +57,12 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else if (!modelPermissions.read && operationName === "findMany") {
                 return Promise.resolve([]);
               } else {
-                return query({
-                  ...args,
-                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  where: resolveWhere(modelPermissions.read, context, fieldsMap, modelName, args.where),
-                });
+                const [selectAndInclude, where] = await Promise.all([
+                  resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  resolveWhere(modelPermissions.read, context, fieldsMap, modelName, args.where),
+                ]);
+
+                return query({ ...args, ...selectAndInclude, where });
               }
             case "aggregate":
             case "count":
@@ -78,18 +80,19 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  where: resolveWhere(modelPermissions.read, context, fieldsMap, modelName, args.where),
+                  where: await resolveWhere(modelPermissions.read, context, fieldsMap, modelName, args.where),
                 });
               }
             case "create":
               if (!modelPermissions.create) {
                 throw authorizationError;
               } else {
-                return query({
-                  ...args,
-                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  data: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.data),
-                });
+                const [selectAndInclude, data] = await Promise.all([
+                  resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.data),
+                ]);
+
+                return query({ ...args, ...selectAndInclude, data });
               }
             case "createMany":
               if (!modelPermissions.create) {
@@ -101,12 +104,13 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               if (!modelPermissions.update) {
                 throw authorizationError;
               } else {
-                return query({
-                  ...args,
-                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  data: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.data),
-                  where: resolveWhereUnique(modelPermissions.update, context, fieldsMap, modelName, args.where),
-                });
+                const [selectAndInclude, data, where] = await Promise.all([
+                  resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.data),
+                  resolveWhereUnique(modelPermissions.update, context, fieldsMap, modelName, args.where),
+                ]);
+
+                return query({ ...args, ...selectAndInclude, data, where });
               }
             case "updateMany":
               if (!modelPermissions.update) {
@@ -114,30 +118,32 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  where: resolveWhere(modelPermissions.update, context, fieldsMap, modelName, args.where),
+                  where: await resolveWhere(modelPermissions.update, context, fieldsMap, modelName, args.where),
                 });
               }
             case "upsert":
               if (!modelPermissions.create || !modelPermissions.update) {
                 throw authorizationError;
               } else {
-                return query({
-                  ...args,
-                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.create),
-                  update: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.update),
-                  where: resolveWhereUnique(modelPermissions.update, context, fieldsMap, modelName, args.where),
-                });
+                const [selectAndInclude, create, update, where] = await Promise.all([
+                  resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.create),
+                  resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.update),
+                  resolveWhereUnique(modelPermissions.update, context, fieldsMap, modelName, args.where),
+                ]);
+
+                return query({ ...args, ...selectAndInclude, create, update, where });
               }
             case "delete":
               if (!modelPermissions.delete) {
                 throw authorizationError;
               } else {
-                return query({
-                  ...args,
-                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  where: resolveWhereUnique(modelPermissions.delete, context, fieldsMap, modelName, args.where),
-                });
+                const [selectAndInclude, where] = await Promise.all([
+                  resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  resolveWhereUnique(modelPermissions.delete, context, fieldsMap, modelName, args.where),
+                ]);
+
+                return query({ ...args, ...selectAndInclude, where });
               }
             case "deleteMany":
               if (!modelPermissions.delete) {
@@ -145,7 +151,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  where: resolveWhere(modelPermissions.delete, context, fieldsMap, modelName, args.where),
+                  where: await resolveWhere(modelPermissions.delete, context, fieldsMap, modelName, args.where),
                 });
               }
           }
