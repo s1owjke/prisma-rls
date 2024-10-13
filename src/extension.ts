@@ -5,12 +5,11 @@ import type { AllOperationsArgs, ExtensionOptions } from "./types";
 import {
   buildFieldsMap,
   generateImpossibleWhere,
-  mergeCreateData,
-  mergeSelectAndInclude,
-  mergeUpdateData,
-  mergeWhere,
-  mergeWhereUnique,
+  resolveSelectAndInclude,
+  resolveCreate,
+  resolveUpdate,
   resolveWhere,
+  resolveWhereUnique,
 } from "./utils";
 
 export const createRlsExtension = ({ dmmf, permissionsConfig, context, authorizationError }: ExtensionOptions) => {
@@ -40,11 +39,8 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  where:
-                    modelPermissions.read === true
-                      ? args.where
-                      : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.read, context)),
+                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  where: resolveWhereUnique(modelPermissions.read, context, fieldsMap, modelName, args.where),
                 });
               }
             case "findFirst":
@@ -62,8 +58,8 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  where: modelPermissions.read === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.read, context)),
+                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  where: resolveWhere(modelPermissions.read, context, fieldsMap, modelName, args.where),
                 });
               }
             case "aggregate":
@@ -82,7 +78,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  where: modelPermissions.read === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.read, context)),
+                  where: resolveWhere(modelPermissions.read, context, fieldsMap, modelName, args.where),
                 });
               }
             case "create":
@@ -91,8 +87,8 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  data: mergeCreateData(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.data),
+                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  data: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.data),
                 });
               }
             case "createMany":
@@ -107,12 +103,9 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  data: mergeUpdateData(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.data),
-                  where:
-                    modelPermissions.update === true
-                      ? args.where
-                      : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.update, context)),
+                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  data: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.data),
+                  where: resolveWhereUnique(modelPermissions.update, context, fieldsMap, modelName, args.where),
                 });
               }
             case "updateMany":
@@ -121,7 +114,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  where: modelPermissions.update === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.update, context)),
+                  where: resolveWhere(modelPermissions.update, context, fieldsMap, modelName, args.where),
                 });
               }
             case "upsert":
@@ -130,13 +123,10 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  create: mergeCreateData(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.create),
-                  update: mergeUpdateData(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.update),
-                  where:
-                    modelPermissions.update === true
-                      ? args.where
-                      : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.update, context)),
+                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  create: resolveCreate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.create),
+                  update: resolveUpdate(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.update),
+                  where: resolveWhereUnique(modelPermissions.update, context, fieldsMap, modelName, args.where),
                 });
               }
             case "delete":
@@ -145,11 +135,8 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  ...mergeSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
-                  where:
-                    modelPermissions.delete === true
-                      ? args.where
-                      : mergeWhereUnique(fieldsMap, modelName, args.where, resolveWhere(modelPermissions.delete, context)),
+                  ...resolveSelectAndInclude(permissionsConfig, context, authorizationError, fieldsMap, modelName, args.select, args.include),
+                  where: resolveWhereUnique(modelPermissions.delete, context, fieldsMap, modelName, args.where),
                 });
               }
             case "deleteMany":
@@ -158,7 +145,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               } else {
                 return query({
                   ...args,
-                  where: modelPermissions.delete === true ? args.where : mergeWhere(args.where, resolveWhere(modelPermissions.delete, context)),
+                  where: resolveWhere(modelPermissions.delete, context, fieldsMap, modelName, args.where),
                 });
               }
           }
