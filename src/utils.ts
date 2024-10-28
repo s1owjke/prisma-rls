@@ -164,35 +164,8 @@ const resolveRelationSelect = async (
     const relationModelName = fieldDef.type;
     const relationPermissions = permissionsConfig[relationModelName];
 
-    if (fieldDef.isList) {
-      if (!relationPermissions.read) {
-        return { where: generateImpossibleWhere(fieldsMap[modelName]) };
-      } else if (relationPermissions.read !== true && selectValue === true) {
-        return { where: await resolvePermissionDefinition(relationPermissions.read, context) }; //
-      } else if (relationPermissions.read !== true && selectValue !== false) {
-        const [selectAndInclude, permissionDefinition] = await Promise.all([
-          resolveSelectAndInclude(
-            permissionsConfig,
-            context,
-            authorizationError,
-            fieldsMap,
-            relationModelName,
-            selectValue.select,
-            selectValue.include,
-          ),
-          resolvePermissionDefinition(relationPermissions.read, context),
-        ]);
-
-        return {
-          ...selectValue,
-          ...selectAndInclude,
-          where: mergeWhere(selectValue.where, permissionDefinition),
-        };
-      }
-    } else {
-      const foreignKeys = fieldDef.relationFromFields?.map((relationFromField) => fieldsMap[modelName][relationFromField]) || [];
-
-      if (foreignKeys.every((foreignKey) => foreignKey.isRequired) && relationPermissions.read !== true && selectValue !== false) {
+    if (!fieldDef.isList && fieldDef.isRequired) {
+      if (relationPermissions.read !== true && selectValue !== false) {
         return {
           ...selectValue,
           ...(await resolveSelectAndInclude(
@@ -205,7 +178,34 @@ const resolveRelationSelect = async (
             selectValue.include,
           )),
         };
+      } else {
+        return selectValue;
       }
+    }
+
+    if (!relationPermissions.read) {
+      return { where: generateImpossibleWhere(fieldsMap[modelName]) };
+    } else if (relationPermissions.read !== true && selectValue === true) {
+      return { where: await resolvePermissionDefinition(relationPermissions.read, context) }; //
+    } else if (relationPermissions.read !== true && selectValue !== false) {
+      const [selectAndInclude, permissionDefinition] = await Promise.all([
+        resolveSelectAndInclude(
+          permissionsConfig,
+          context,
+          authorizationError,
+          fieldsMap,
+          relationModelName,
+          selectValue.select,
+          selectValue.include,
+        ),
+        resolvePermissionDefinition(relationPermissions.read, context),
+      ]);
+
+      return {
+        ...selectValue,
+        ...selectAndInclude,
+        where: mergeWhere(selectValue.where, permissionDefinition),
+      };
     }
 
     return selectValue;
