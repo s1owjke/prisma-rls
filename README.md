@@ -111,8 +111,12 @@ After that, all non-raw queries will be executed according to the defined permis
 
 ## Edge cases
 
-A known edge case involves one-to-one mandatory relationships on the owner side (the entity containing the foreign key).
+A known edge case involves all belongs-to mandatory relationships on the owner side (the entity containing the foreign key).
 
-Prisma [doesn't generate](https://github.com/prisma/prisma/issues/15708) filters in that case due to potential referential integrity violations, which could lead to inconsistent query results.
+Prisma [doesn't generate](https://github.com/prisma/prisma/issues/15708) filters in that case due to potential referential integrity violations, which could lead to inconsistent query results. Because we can't apply RLS filters in this case, no additional "where" clauses are added.
 
-As a temporary solution, because we can't apply RLS filters in this case, no additional "where" clauses are added. Please handle this at the policy level.
+When models have required foreign keys with restricted read access, you have three options:
+
+- make them optional - change required foreign keys to allow `null` values
+- handle at policy level - restrict reading models with required foreign keys using consistent policy filters
+- accept current behavior - be aware that such relations are readable or handle it at app level
