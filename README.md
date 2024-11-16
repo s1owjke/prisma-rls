@@ -117,6 +117,6 @@ Prisma [doesn't generate](https://github.com/prisma/prisma/issues/15708) filters
 
 When models have required foreign keys with restricted read access, you have three options:
 
-- make them optional - change required foreign keys to allow `null` values when policy restricts reading
+- make them optional - change required foreign keys to allow `null` values
 - handle at policy level - restrict reading models with required foreign keys using consistent policy filters
 - accept current behavior - be aware that such relations are readable or handle it at app level
