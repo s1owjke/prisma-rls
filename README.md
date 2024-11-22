@@ -83,7 +83,7 @@ import { permissionsRegistry, PermissionsContext } from "./permissions";
   const prisma = new PrismaClient();
   const server = Fastify();
 
-  const resolveDb = async (request: FastifyRequest) => {
+  const resolveRequestConext = async (request: FastifyRequest) => {
     const user = await resolveUser(request.headers.authorization);
     const userRole = user ? user.role : "Guest";
     

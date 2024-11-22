@@ -9,21 +9,9 @@ describe("model reading", () => {
       await expect(user).resolves.toEqual(null);
     });
 
-    test("if read is denied it throw an error", async () => {
-      const db = resolveDb();
-      const user = db.user.findUniqueOrThrow({ where: { id: 1 } });
-      await expect(user).rejects.toThrowError(PrismaClientKnownRequestError);
-    });
-
-    test("if read is allowed it return all records", async () => {
+    test("if read is allowed it return record", async () => {
       const db = resolveDb({ User: { read: true } });
       const user = db.user.findUnique({ where: { id: 1 } });
-      await expect(user).resolves.toMatchObject({ id: 1 });
-    });
-
-    test("if read is allowed it return all records", async () => {
-      const db = resolveDb({ User: { read: true } });
-      const user = db.user.findUniqueOrThrow({ where: { id: 1 } });
       await expect(user).resolves.toMatchObject({ id: 1 });
     });
 
@@ -32,8 +20,22 @@ describe("model reading", () => {
       const user = db.user.findUnique({ where: { id: 1 } });
       await expect(user).resolves.toEqual(null);
     });
+  });
 
-    test("if read is where it return filtered result", async () => {
+  describe("find unique or throw", () => {
+    test("if read is denied it throw an error", async () => {
+      const db = resolveDb();
+      const user = db.user.findUniqueOrThrow({ where: { id: 1 } });
+      await expect(user).rejects.toThrowError(PrismaClientKnownRequestError);
+    });
+
+    test("if read is allowed it return record", async () => {
+      const db = resolveDb({ User: { read: true } });
+      const user = db.user.findUniqueOrThrow({ where: { id: 1 } });
+      await expect(user).resolves.toMatchObject({ id: 1 });
+    });
+
+    test("if read is where it return filtered result or throw an error", async () => {
       const db = resolveDb({ User: { read: { name: { not: { equals: "John Doe" } } } } });
       const user = db.user.findUniqueOrThrow({ where: { id: 1 } });
       await expect(user).rejects.toThrowError(PrismaClientKnownRequestError);
@@ -47,21 +49,9 @@ describe("model reading", () => {
       await expect(user).resolves.toEqual(null);
     });
 
-    test("if read is denied it throw error", async () => {
-      const db = resolveDb();
-      const user = db.user.findFirstOrThrow({ where: { id: { equals: 1 } } });
-      await expect(user).rejects.toThrowError(PrismaClientKnownRequestError);
-    });
-
-    test("if read is allowed it return all records", async () => {
+    test("if read is allowed it return record", async () => {
       const db = resolveDb({ User: { read: true } });
       const user = db.user.findFirst({ where: { id: { equals: 1 } } });
-      await expect(user).resolves.toMatchObject({ id: 1 });
-    });
-
-    test("if read is allowed it return all records", async () => {
-      const db = resolveDb({ User: { read: true } });
-      const user = db.user.findFirstOrThrow({ where: { id: { equals: 1 } } });
       await expect(user).resolves.toMatchObject({ id: 1 });
     });
 
@@ -70,8 +60,22 @@ describe("model reading", () => {
       const user = db.user.findFirst({ where: { id: { equals: 1 } } });
       await expect(user).resolves.toEqual(null);
     });
+  });
 
-    test("if read is where it return filtered result", async () => {
+  describe("find first or throw", () => {
+    test("if read is denied it throw an error", async () => {
+      const db = resolveDb();
+      const user = db.user.findFirstOrThrow({ where: { id: { equals: 1 } } });
+      await expect(user).rejects.toThrowError(PrismaClientKnownRequestError);
+    });
+
+    test("if read is allowed it return record", async () => {
+      const db = resolveDb({ User: { read: true } });
+      const user = db.user.findFirstOrThrow({ where: { id: { equals: 1 } } });
+      await expect(user).resolves.toMatchObject({ id: 1 });
+    });
+
+    test("if read is where it return filtered result or throw an error", async () => {
       const db = resolveDb({ User: { read: { name: { not: { equals: "John Doe" } } } } });
       const user = db.user.findFirstOrThrow({ where: { id: { equals: 1 } } });
       await expect(user).rejects.toThrowError(PrismaClientKnownRequestError);

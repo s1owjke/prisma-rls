@@ -11,11 +11,18 @@ import { PrismaClient } from "@prisma/client";
     ],
   });
 
+  await prisma.category.createMany({
+    data: [
+      { id: 1, name: "First" },
+      { id: 2, name: "Second" },
+    ],
+  });
+
   await prisma.post.createMany({
     data: [
-      { id: 1, published: true, authorId: 1, title: "Quick bites", content: "Easy 5-minute snack recipes" },
-      { id: 2, published: false, authorId: 1, title: "Tech today", content: "Latest gadget news & reviews" },
-      { id: 3, published: true, authorId: 2, title: "Green living", content: "Eco-friendly home hacks" },
+      { id: 1, published: true, categoryId: 1, authorId: 1, title: "Quick bites", content: "Easy 5-minute snack recipes" },
+      { id: 2, published: false, categoryId: 1, authorId: 1, title: "Tech today", content: "Latest gadget news & reviews" },
+      { id: 3, published: true, categoryId: 2, authorId: 2, title: "Green living", content: "Eco-friendly home hacks" },
     ],
   });
 
