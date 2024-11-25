@@ -46,7 +46,7 @@ export const generateImpossibleWhere = (fields: Record<string, DMMF.Field>): Rec
       const date = new Date();
       return { AND: [{ [targetField.name]: { equals: date } }, { [targetField.name]: { not: { equals: date } } }] };
     case "JSON":
-      return { AND: [{ [targetField.name]: { equals: null } }, { [targetField.name]: { not: { equals: null } } }] };
+      return { AND: [{ [fieldDef.name]: { equals: 0 } }, { [fieldDef.name]: { not: 0 } }] };
     default:
       throw new Error("Unsupported data type");
   }
