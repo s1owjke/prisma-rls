@@ -14,11 +14,16 @@ export type PrismaModelWhereResolver<TypeMap extends PrismaTypeMap, ModelName ex
   context: Context,
 ) => PrismaModelWhere<TypeMap, ModelName> | Promise<PrismaModelWhere<TypeMap, ModelName>>;
 
+export type PermissionDefinition<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>, Context extends unknown> =
+  | boolean
+  | PrismaModelWhere<TypeMap, ModelName>
+  | PrismaModelWhereResolver<TypeMap, ModelName, Context>;
+
 export type ModelPermissionsConfig<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>, Context extends unknown> = {
-  read: boolean | PrismaModelWhere<TypeMap, ModelName> | PrismaModelWhereResolver<TypeMap, ModelName, Context>;
+  read: PermissionDefinition<TypeMap, ModelName, Context>;
   create: boolean;
-  update: boolean | PrismaModelWhere<TypeMap, ModelName> | PrismaModelWhereResolver<TypeMap, ModelName, Context>;
-  delete: boolean | PrismaModelWhere<TypeMap, ModelName> | PrismaModelWhereResolver<TypeMap, ModelName, Context>;
+  update: PermissionDefinition<TypeMap, ModelName, Context>;
+  delete: PermissionDefinition<TypeMap, ModelName, Context>;
 };
 
 export type PermissionsConfig<TypeMap extends PrismaTypeMap, Context extends unknown> = {
@@ -34,7 +39,7 @@ export type ExtensionOptions = {
 
 export type AllOperationsArgs = {
   operation: string;
-  model: string;
+  model: PrismaModelName<PrismaTypeMap>;
   args: Record<string, any>;
   query: (args: Record<string, any>) => Promise<unknown>;
 };
