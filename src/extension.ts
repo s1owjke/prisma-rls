@@ -5,8 +5,8 @@ import type { AllOperationsArgs, ExtensionOptions } from "./types";
 import {
   buildFieldsMap,
   generateImpossibleWhere,
-  resolveSelectAndInclude,
   resolveCreate,
+  resolveSelectAndInclude,
   resolveUpdate,
   resolveWhere,
   resolveWhereUnique,
