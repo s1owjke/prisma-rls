@@ -35,6 +35,7 @@ export type ExtensionOptions = {
   permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>;
   context: unknown;
   authorizationError?: Error;
+  checkRequiredBelongsTo?: boolean;
 };
 
 export type AllOperationsArgs = {
@@ -45,3 +46,13 @@ export type AllOperationsArgs = {
 };
 
 export type FieldsMap = Record<string, Record<string, DMMF.Field>>;
+
+export type RelationMetadata = {
+  type: "requiredBelongsTo";
+  path: string;
+  modelName: PrismaModelName<PrismaTypeMap>;
+};
+
+export type RecursiveContext = {
+  path: string;
+};

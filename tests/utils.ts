@@ -1,10 +1,10 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { ITXClientDenyList } from "@prisma/client/runtime/library";
 
 import { createRlsExtension, PermissionsConfig } from "../src";
 
 import { denyPermissions } from "./consts";
 import { PartialPermissionsConfig } from "./types";
-import { ITXClientDenyList } from "@prisma/client/runtime/library";
 
 const isObject = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null;
@@ -29,11 +29,15 @@ const mergeObjectsDeep = (first: Record<string, unknown>, second: Record<string,
   return result;
 };
 
-export const resolveDb = (overridePermissions: PartialPermissionsConfig<Prisma.TypeMap, null> = {}) => {
+export const resolveDb = (
+  overridePermissions: PartialPermissionsConfig<Prisma.TypeMap, null> = {},
+  options: { checkRequiredBelongsTo?: boolean } = {},
+): PrismaClient => {
   const rlsExtension = createRlsExtension({
     dmmf: Prisma.dmmf,
     permissionsConfig: mergeObjectsDeep(denyPermissions, overridePermissions) as PermissionsConfig<Prisma.TypeMap, null>,
     context: null,
+    ...options,
   });
 
   return new PrismaClient().$extends(rlsExtension) as unknown as PrismaClient;
