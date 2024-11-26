@@ -111,12 +111,42 @@ After that, all non-raw queries will be executed according to the defined permis
 
 ## Edge cases
 
-A known edge case involves all belongs-to mandatory relationships on the owner side (the entity containing the foreign key).
+At the moment there is only a known edge case.
 
-Prisma [doesn't generate](https://github.com/prisma/prisma/issues/15708) filters in that case due to potential referential integrity violations, which could lead to inconsistent query results. Because we can't apply RLS filters in this case, no additional "where" clauses are added.
+### Required belongs-to
 
-When models have required foreign keys with restricted read access, you have three options:
+An edge case affects all mandatory belongs-to relations on the owner side (the entity owns the foreign key). 
 
-- make them optional - change required foreign keys to allow `null` values
-- handle at policy level - restrict reading models with required foreign keys using consistent policy filters
-- accept current behavior - be aware that such relations are readable or handle it at app level
+In these cases, Prisma does not generate filters due to potential referential integrity violations. For performance reasons, no additional checks are applied by default. However, you can change this behavior by enabling the `checkRequiredBelongsTo` flag:
+
+```typescript
+const rlsExtension = createRlsExtension({
+  dmmf: Prisma.dmmf,
+  permissionsConfig: permissionsRegistry[userRole],
+  context: permissionsContext,
+  checkRequiredBelongsTo: true,
+});
+```
+
+When `checkRequiredBelongsTo` is set to true, the library performs an additional query for each required belongs-to relation (it makes one batched request per relation, not per record) to verify that all data complies with the current permissions.
+
+If the policy restricts data access, an error will be thrown, this error should be handled at the application level:
+
+```typescript
+try {
+  return await db.post.findMany({ 
+    select: { id: true, category: { select: { id: true } } }
+  });
+} catch (error) {
+  if (error instanceof Error && error.message === "Referential integrity violation") {
+    return [];
+  }
+  
+  throw error;
+}
+```
+
+Alternatively, you can consider the following options:
+
+- Make them optional - keep the foreign keys required but define the relationships as optional
+- Handle at the policy level - apply consistent policy filters to restrict access to both sides of relation
