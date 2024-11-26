@@ -1,7 +1,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { ITXClientDenyList } from "@prisma/client/runtime/library";
 
-import { createRlsExtension, PermissionsConfig } from "../src";
+import { PermissionsConfig, createRlsExtension } from "../src";
 
 import { denyPermissions } from "./consts";
 import { PartialPermissionsConfig } from "./types";

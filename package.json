@@ -21,6 +21,8 @@
   "scripts": {
     "build": "rm -rf dist && tsc",
     "build:watch": "rm -rf dist && tsc --watch",
+    "lint": "yarn biome check",
+    "lint:fix": "yarn biome check --write",
     "typecheck": "tsc --noEmit",
     "test": "jest"
   },
