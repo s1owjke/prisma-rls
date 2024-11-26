@@ -1,4 +1,4 @@
-import { resolveDb, executeAndRollback } from "./utils";
+import { executeAndRollback, resolveDb } from "./utils";
 
 describe("model creating", () => {
   describe("create", () => {

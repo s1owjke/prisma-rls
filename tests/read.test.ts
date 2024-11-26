@@ -1,5 +1,6 @@
-import { resolveDb } from "./utils";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+
+import { resolveDb } from "./utils";
 
 describe("model reading", () => {
   describe("find unique", () => {

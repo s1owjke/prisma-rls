@@ -1,5 +1,6 @@
-import { executeAndRollback, resolveDb } from "./utils";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+
+import { executeAndRollback, resolveDb } from "./utils";
 
 describe("model deletion", () => {
   describe("delete", () => {
