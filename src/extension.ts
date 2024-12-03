@@ -69,7 +69,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
                     modelResolver.resolveWhere(modelPermissions.read, modelName, args.where),
                   ]);
 
-                  const result = await query({ ...args, ...selectAndInclude.value, where });
+                  const result = await query({ ...args, ...selectAndInclude, where });
 
                   if (checkRequiredBelongsTo) {
                     return modelResolver.performRelationProcessing(getTransactionClient(prismaClient, params), result, relationsMetadata);
