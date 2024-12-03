@@ -2,13 +2,10 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { ITXClientDenyList } from "@prisma/client/runtime/library";
 
 import { PermissionsConfig, createRlsExtension } from "../src";
+import { isObject } from "../src/utils";
 
 import { denyPermissions } from "./consts";
 import { PartialPermissionsConfig } from "./types";
-
-const isObject = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null;
-};
 
 const mergeObjectsDeep = (first: Record<string, unknown>, second: Record<string, unknown>) => {
   const result = { ...first };
