@@ -104,7 +104,7 @@ export class ModelResolver {
         if (this.checkRequiredBelongsTo && relationPermissions.read !== true) {
           const primaryKeyField = getPrimaryKeyField(relationFields);
 
-          if (isObject(selectValue) && !selectValue.select[primaryKeyField.name] && !selectValue.include) {
+          if (isObject(selectValue) && isObject(selectValue.select) && !selectValue.select[primaryKeyField.name] && !selectValue.include) {
             throw new Error("You must select a primary key for the required belongs to relations");
           }
 
