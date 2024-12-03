@@ -16,6 +16,10 @@ export const buildFieldsMap = (dmmf: BaseDMMF): FieldsMap => {
   return fieldsMap;
 };
 
+export const isObject = (value: unknown): value is Record<string, any> => {
+  return typeof value === "object" && value !== null;
+};
+
 export const mapValues = async <T extends Record<string, any>>(object: T, iteratee: (value: T[keyof T], key: keyof T) => Promise<T[keyof T]>) => {
   return Object.fromEntries(await Promise.all(Object.entries(object).map(async ([key, value]) => [key, await iteratee(value, key)])));
 };

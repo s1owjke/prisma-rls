@@ -4,6 +4,7 @@ import type { FieldsMap, PermissionsConfig, PrismaTypeMap, RecursiveContext, Rel
 import {
   generateImpossibleWhere,
   getPrimaryKeyField,
+  isObject,
   lowerFirst,
   mapValues,
   mergeWhere,
@@ -74,16 +75,16 @@ export class ModelResolver {
   ): Promise<Record<string, any>> {
     return mapValues(select, async (selectValue, selectName) => {
       if (selectName === "_count") {
-        if (selectValue === true) {
-          return {
-            select: this.generateModelRelationsCount(modelName),
-          };
-        } else if (selectValue !== false && selectValue.select) {
+        if (!selectValue) {
+          return selectValue;
+        } else if (selectValue !== true && selectValue.select) {
           return {
             select: await this.resolveRelationSelect(modelName, selectValue.select, relationsMetadata, { path: `${recursiveContext.path}._count` }),
           };
         } else {
-          return selectValue;
+          return {
+            select: this.generateModelRelationsCount(modelName),
+          };
         }
       }
 
@@ -100,21 +101,21 @@ export class ModelResolver {
       };
 
       if (!fieldDef.isList && fieldDef.isRequired) {
-        if (relationPermissions.read !== true && selectValue !== false) {
-          if (this.checkRequiredBelongsTo) {
-            const primaryKeyField = getPrimaryKeyField(relationFields);
+        if (this.checkRequiredBelongsTo && relationPermissions.read !== true) {
+          const primaryKeyField = getPrimaryKeyField(relationFields);
 
-            if (selectValue !== true && !selectValue.select[primaryKeyField.name] && !selectValue.include) {
-              throw new Error("You must select a primary key for the required belongs to relations");
-            }
-
-            relationsMetadata.push({
-              type: "requiredBelongsTo",
-              path: relationRecursiveContext.path,
-              modelName: relationModelName,
-            });
+          if (isObject(selectValue) && !selectValue.select[primaryKeyField.name] && !selectValue.include) {
+            throw new Error("You must select a primary key for the required belongs to relations");
           }
 
+          relationsMetadata.push({
+            type: "requiredBelongsTo",
+            path: relationRecursiveContext.path,
+            modelName: relationModelName,
+          });
+        }
+
+        if (isObject(selectValue)) {
           return {
             ...selectValue,
             ...(await this.resolveSelectAndInclude(
@@ -144,6 +145,17 @@ export class ModelResolver {
           ...selectValue,
           ...selectAndInclude,
           where: mergeWhere(selectValue.where, permissionDefinition),
+        };
+      } else if (isObject(selectValue)) {
+        return {
+          ...selectValue,
+          ...(await this.resolveSelectAndInclude(
+            relationModelName,
+            selectValue.select,
+            selectValue.include,
+            relationsMetadata,
+            relationRecursiveContext,
+          )),
         };
       }
 
