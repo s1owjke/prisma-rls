@@ -605,7 +605,7 @@ export class ModelResolver {
     for (const relationMetadata of relationsMetadata) {
       switch (relationMetadata.type) {
         case "requiredBelongsTo":
-          const matchingRelations = pickByPath(result, Array.isArray(result) ? relationMetadata.path.replace("$.", "$.*.") : relationMetadata.path);
+          const matchingRelations = pickByPath(result, relationMetadata.path);
           if (!matchingRelations.length) {
             continue;
           }
