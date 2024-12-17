@@ -97,7 +97,7 @@ export class ModelResolver {
       const relationFields = this.fieldsMap[relationModelName];
       const relationPermissions = this.permissionsConfig[relationModelName];
       const relationRecursiveContext = {
-        path: fieldDef.isList ? `${recursiveContext.path}.*.${selectName}` : `${recursiveContext.path}.${selectName}`,
+        path: fieldDef.isList ? `${recursiveContext.path}.${selectName}.*` : `${recursiveContext.path}.${selectName}`,
       };
 
       if (!fieldDef.isList && fieldDef.isRequired) {
@@ -168,7 +168,7 @@ export class ModelResolver {
     select: Record<string, any> | undefined,
     include: Record<string, any> | undefined,
     relationsMetadata: RelationMetadata[],
-    recursiveContext: RecursiveContext = { path: "$" },
+    recursiveContext: RecursiveContext,
   ): Promise<Record<string, any>> {
     if (select) {
       return {
