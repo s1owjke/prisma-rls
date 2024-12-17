@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client/extension";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 import { ModelResolver } from "./logic";
-import type { AllOperationsArgs, ExtensionOptions, RelationMetadata } from "./types";
+import type { AllOperationsArgs, ExtensionOptions, RecursiveContext, RelationMetadata } from "./types";
 import { buildFieldsMap, generateImpossibleWhere, getTransactionClient } from "./utils";
 
 export const createRlsExtension = ({ dmmf, permissionsConfig, context, authorizationError, checkRequiredBelongsTo }: ExtensionOptions) => {
@@ -37,7 +37,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
                   const relationsMetadata: RelationMetadata[] = [];
 
                   const [selectAndInclude, where] = await Promise.all([
-                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata),
+                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata, { path: "$" }),
                     modelResolver.resolveWhereUnique(modelPermissions.read, modelName, args.where),
                   ]);
 
@@ -63,9 +63,10 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
                   return Promise.resolve([]);
                 } else {
                   const relationsMetadata: RelationMetadata[] = [];
+                  const recursiveContext: RecursiveContext = { path: operationName === "findMany" ? "$.*" : "$" };
 
                   const [selectAndInclude, where] = await Promise.all([
-                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata),
+                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata, recursiveContext),
                     modelResolver.resolveWhere(modelPermissions.read, modelName, args.where),
                   ]);
 
@@ -102,7 +103,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
                   const relationsMetadata: RelationMetadata[] = [];
 
                   const [selectAndInclude, data] = await Promise.all([
-                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata),
+                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata, { path: "$" }),
                     modelResolver.resolveCreate(modelName, args.data),
                   ]);
 
@@ -127,7 +128,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
                   const relationsMetadata: RelationMetadata[] = [];
 
                   const [selectAndInclude, data, where] = await Promise.all([
-                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata),
+                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata, { path: "$" }),
                     modelResolver.resolveUpdate(modelName, args.data),
                     modelResolver.resolveWhereUnique(modelPermissions.update, modelName, args.where),
                   ]);
@@ -164,7 +165,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
                   const relationsMetadata: RelationMetadata[] = [];
 
                   const [selectAndInclude, create, update, where] = await Promise.all([
-                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata),
+                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata, { path: "$" }),
                     modelResolver.resolveCreate(modelName, args.create),
                     modelResolver.resolveUpdate(modelName, args.update),
                     modelResolver.resolveWhereUnique(modelPermissions.update, modelName, args.where),
@@ -185,7 +186,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
                   const relationsMetadata: RelationMetadata[] = [];
 
                   const [selectAndInclude, where] = await Promise.all([
-                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata),
+                    modelResolver.resolveSelectAndInclude(modelName, args.select, args.include, relationsMetadata, { path: "$" }),
                     modelResolver.resolveWhereUnique(modelPermissions.delete, modelName, args.where),
                   ]);
 
