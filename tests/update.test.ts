@@ -1,5 +1,6 @@
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
+import { AuthorizationError } from "../src";
 import { executeAndRollback, resolveDb } from "./utils";
 
 describe("model updating", () => {
@@ -9,7 +10,7 @@ describe("model updating", () => {
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.post.update({ where: { id: 1 }, data: { published: false } });
-        await expect(user).rejects.toThrowError("Not authorized");
+        await expect(user).rejects.toThrowError(AuthorizationError);
       });
     });
 
@@ -38,7 +39,7 @@ describe("model updating", () => {
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.post.updateMany({ where: { id: { equals: 1 } }, data: { published: { set: false } } });
-        await expect(user).rejects.toThrowError("Not authorized");
+        await expect(user).rejects.toThrowError(AuthorizationError);
       });
     });
 

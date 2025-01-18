@@ -133,12 +133,14 @@ When `checkRequiredBelongsTo` is set to true, the library performs an additional
 If the policy restricts data access, an error will be thrown, this error should be handled at the application level:
 
 ```typescript
+import { ReferentialIntegrityError } from "prisma-rls";
+
 try {
   return await db.post.findMany({ 
     select: { id: true, category: { select: { id: true } } }
   });
 } catch (error) {
-  if (error instanceof Error && error.message === "Referential integrity violation") {
+  if (error instanceof ReferentialIntegrityError) {
     return [];
   }
   

@@ -1,5 +1,6 @@
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
+import { AuthorizationError } from "../src";
 import { executeAndRollback, resolveDb } from "./utils";
 
 describe("model deletion", () => {
@@ -9,7 +10,7 @@ describe("model deletion", () => {
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.post.delete({ where: { id: 1 } });
-        await expect(user).rejects.toThrowError("Not authorized");
+        await expect(user).rejects.toThrowError(AuthorizationError);
       });
     });
 
@@ -38,7 +39,7 @@ describe("model deletion", () => {
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.post.deleteMany({ where: { id: { equals: 1 } } });
-        await expect(user).rejects.toThrowError("Not authorized");
+        await expect(user).rejects.toThrowError(AuthorizationError);
       });
     });
 

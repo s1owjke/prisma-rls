@@ -1,9 +1,9 @@
 import type { Prisma, PrismaClientExtends } from "@prisma/client/extension";
-import type { BaseDMMF, DMMF, DefaultArgs } from "@prisma/client/runtime/library";
+import type { BaseDMMF, DMMF } from "@prisma/client/runtime/library";
 
-import type { AllOperationsArgs, FieldsMap } from "./types";
+import { AllOperationsArgs, FieldsMap, ObjectEntry } from "./types";
 
-export const buildFieldsMap = (dmmf: BaseDMMF): FieldsMap => {
+export function buildFieldsMap(dmmf: BaseDMMF): FieldsMap {
   const fieldsMap: FieldsMap = {};
 
   for (const model of dmmf.datamodel.models) {
@@ -14,65 +14,84 @@ export const buildFieldsMap = (dmmf: BaseDMMF): FieldsMap => {
   }
 
   return fieldsMap;
-};
+}
 
-export const isObject = (value: unknown): value is Record<string, any> => {
-  return typeof value === "object" && value !== null;
-};
+export function getTransactionClient(prismaClient: PrismaClientExtends, allOperationsArgs: AllOperationsArgs): Prisma.TransactionClient {
+  const transaction = (allOperationsArgs as any).__internalParams.transaction;
 
-export const mapValues = async <T extends Record<string, any>>(object: T, iteratee: (value: T[keyof T], key: keyof T) => Promise<T[keyof T]>) => {
-  return Object.fromEntries(await Promise.all(Object.entries(object).map(async ([key, value]) => [key, await iteratee(value, key)])));
-};
-
-export const transformValue = <T extends any>(value: T | T[], callback: (value: T) => Promise<T>) => {
-  return Array.isArray(value) ? Promise.all(value.map(callback)) : callback(value);
-};
-
-export const generateImpossibleWhere = (fields: Record<string, DMMF.Field>): Record<string, any> => {
-  const fieldDef = Object.values(fields).find((field) => field.isId || field.isUnique);
-  if (!fieldDef) {
-    throw new Error("Couldn't find primary key or unique field");
+  if (transaction && transaction.kind === "itx") {
+    return (prismaClient as any)._createItxClient(transaction);
   }
 
-  switch (fieldDef.type) {
+  return prismaClient;
+}
+
+export function generateImpossibleWhere(fields: Record<string, DMMF.Field>): Record<string, unknown> {
+  const uniqueField = getUniqueField(fields);
+
+  switch (uniqueField.type) {
     case "Boolean":
-      return { AND: [{ [fieldDef.name]: { equals: true } }, { [fieldDef.name]: { not: { equals: false } } }] };
+      return { [uniqueField.name]: { equals: true, not: { equals: false } } };
     case "BigInt":
     case "Decimal":
     case "Float":
     case "Int":
-      return { AND: [{ [fieldDef.name]: { equals: 0 } }, { [fieldDef.name]: { not: { equals: 0 } } }] };
+      return { [uniqueField.name]: { equals: 0, not: { equals: 0 } } };
     case "String":
-      return { AND: [{ [fieldDef.name]: { equals: "" } }, { [fieldDef.name]: { not: { equals: "" } } }] };
+      return { [uniqueField.name]: { equals: "", not: { equals: "" } } };
     case "Bytes":
       const buffer = Buffer.from([]);
-      return { AND: [{ [fieldDef.name]: { equals: buffer } }, { [fieldDef.name]: { not: { equals: buffer } } }] };
+      return { [uniqueField.name]: { equals: buffer, not: { equals: buffer } } };
     case "DateTime":
       const date = new Date();
-      return { AND: [{ [fieldDef.name]: { equals: date } }, { [fieldDef.name]: { not: { equals: date } } }] };
+      return { [uniqueField.name]: { equals: date, not: { equals: date } } };
     case "JSON":
-      return { AND: [{ [fieldDef.name]: { equals: 0 } }, { [fieldDef.name]: { not: 0 } }] };
+      return { [uniqueField.name]: { equals: 0, not: 0 } };
     default:
-      throw new Error("Not implemented");
+      throw new Error(`Couldn't generate impossible where for field type '${uniqueField.type}'`);
   }
-};
+}
 
-export const mergeWhere = (first: Record<string, any> | undefined, second: Record<string, any>): Record<string, any> => {
+export function isFunction(value: unknown): value is Function {
+  return typeof value === "function";
+}
+
+export async function resolvePermissionDefinition(
+  permissionDefinition: Record<string, unknown> | ((context: unknown) => Record<string, unknown> | Promise<Record<string, unknown>>),
+  context: unknown,
+): Promise<Record<string, unknown>> {
+  return isFunction(permissionDefinition) ? permissionDefinition(context) : permissionDefinition;
+}
+
+export function isUniqueField(fieldDef: DMMF.Field): boolean {
+  return fieldDef.isId || fieldDef.isUnique;
+}
+
+export function getUniqueField(fields: Record<string, DMMF.Field>): DMMF.Field {
+  const fieldDef = Object.values(fields).find(isUniqueField);
+  if (!fieldDef) {
+    throw new Error("Couldn't find primary key or other unique field");
+  }
+
+  return fieldDef;
+}
+
+export function mergeWhere(first: Record<string, unknown> | undefined, second: Record<string, unknown>): Record<string, unknown> {
   return first ? { AND: [first, second] } : second;
-};
+}
 
-export const mergeWhereUnique = (
+export function mergeWhereUnique(
   fields: Record<string, DMMF.Field>,
-  firstUnique: Record<string, any>,
-  second: Record<string, any>,
-): Record<string, any> => {
-  const unique: Record<string, any> = {};
-  const rest: Record<string, any> = {};
+  firstUnique: Record<string, unknown>,
+  second: Record<string, unknown>,
+): Record<string, unknown> {
+  const unique: Record<string, unknown> = {};
+  const rest: Record<string, unknown> = {};
 
   for (const [fieldName, fieldValue] of Object.entries(firstUnique)) {
     const fieldDef = fields[fieldName];
 
-    if (fieldDef.isId || fieldDef.isUnique) {
+    if (isUniqueField(fieldDef)) {
       unique[fieldName] = fieldValue;
     } else {
       rest[fieldName] = fieldValue;
@@ -80,71 +99,65 @@ export const mergeWhereUnique = (
   }
 
   return { ...unique, AND: [rest, second] };
-};
+}
 
-export const resolvePermissionDefinition = async (
-  permissionDefinition: boolean | Record<string, any> | ((context: unknown) => Record<string, any>),
-  context: unknown,
-): Promise<Record<string, any>> => {
-  return typeof permissionDefinition === "function" ? await permissionDefinition(context) : permissionDefinition;
-};
+export async function mapObjectValues<Object extends Record<string, unknown>, TransformedValue>(
+  object: Object,
+  iteratee: (item: ObjectEntry<Object>) => Promise<TransformedValue>,
+): Promise<Record<keyof Object, TransformedValue>> {
+  const entries = Object.entries(object) as ObjectEntry<Object>[];
 
-export const getTransactionClient = (prismaClient: PrismaClientExtends<DefaultArgs>, params: AllOperationsArgs): Prisma.TransactionClient => {
-  const transaction = (params as any).__internalParams.transaction;
+  const transformedEntries = await Promise.all(
+    entries.map(async ([key, value]) => {
+      return [key, await iteratee([key, value])];
+    }),
+  );
 
-  if (transaction) {
-    if (transaction.kind === "itx") {
-      return (prismaClient as any)._createItxClient(transaction);
-    } else {
-      return prismaClient;
-    }
-  }
+  return Object.fromEntries(transformedEntries);
+}
 
-  return prismaClient;
-};
+export async function transformValue<Value, TransformedValue>(
+  value: Value | Value[],
+  callback: (value: Value) => Promise<TransformedValue>,
+): Promise<TransformedValue | TransformedValue[]> {
+  return Array.isArray(value) ? Promise.all(value.map(callback)) : callback(value);
+}
 
-export const getPrimaryKeyField = (fields: Record<string, DMMF.Field>): DMMF.Field => {
-  const fieldDef = Object.values(fields).find((field) => field.isId);
-  if (!fieldDef) {
-    throw new Error("Couldn't find primary key");
-  }
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
 
-  return fieldDef;
-};
-
-export const pickByPath = (value: any, pathExpression: string) => {
+export function pickByPath(value: unknown, pathExpression: string): any[] {
   const result: any[] = [];
 
-  const traverse = (currentValue: any, pathSegments: string[]) => {
+  const traverse = (currentValue: unknown, pathSegments: string[]) => {
     if (!pathSegments.length) {
       result.push(currentValue);
+      return;
+    } else if (!isObject(currentValue)) {
       return;
     }
 
     const [currentSegment, ...restSegments] = pathSegments;
 
-    if (currentValue && typeof currentValue === "object") {
-      if (currentSegment === "*" && Array.isArray(currentValue)) {
-        for (const item of currentValue) {
-          traverse(item, restSegments);
-        }
-      } else if (currentSegment === "*") {
-        throw new Error("Wildcard path traversal is not supported for object types");
-      } else if (currentSegment in currentValue) {
-        traverse(currentValue[currentSegment], restSegments);
-      }
+    if (currentSegment === "*" && Array.isArray(currentValue)) {
+      currentValue.map((item) => traverse(item, restSegments));
+    } else if (currentSegment === "*") {
+      throw new Error("Wildcards are supported only for arrays");
+    } else if (currentSegment in currentValue) {
+      traverse(currentValue[currentSegment], restSegments);
     }
   };
 
   traverse(value, pathExpression.replace(/^\$\./, "").split("."));
 
   return result;
-};
+}
 
-export const uniqueArray = <T>(array: T[]): T[] => {
-  return [...new Set(array)];
-};
+export function uniqueArray<Value>(values: Value[]): Value[] {
+  return [...new Set(values)];
+}
 
-export const lowerFirst = (string: string): string => {
+export function lowerFirst(string: string): string {
   return string.charAt(0).toLowerCase() + string.slice(1);
-};
+}

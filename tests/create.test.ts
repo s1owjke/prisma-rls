@@ -1,3 +1,4 @@
+import { AuthorizationError } from "../src";
 import { executeAndRollback, resolveDb } from "./utils";
 
 describe("model creating", () => {
@@ -7,7 +8,7 @@ describe("model creating", () => {
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.user.create({ data: { email: "shawn.hudson@test.local", name: "Shawn Hudson" } });
-        await expect(user).rejects.toThrowError("Not authorized");
+        await expect(user).rejects.toThrowError(AuthorizationError);
       });
     });
 
@@ -27,7 +28,7 @@ describe("model creating", () => {
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.user.createMany({ data: { email: "shawn.hudson@test.local", name: "Shawn Hudson" } });
-        await expect(user).rejects.toThrowError("Not authorized");
+        await expect(user).rejects.toThrowError(AuthorizationError);
       });
     });
 

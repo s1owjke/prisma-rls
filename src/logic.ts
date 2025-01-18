@@ -1,12 +1,30 @@
 import type { Prisma } from "@prisma/client/extension";
 
-import type { FieldsMap, PermissionsConfig, PrismaTypeMap, RecursiveContext, RelationMetadata } from "./types";
+import { ReferentialIntegrityError } from "./errors";
+import type {
+  FieldsMap,
+  ModelCreateInput,
+  ModelCreateNestedManyInput,
+  ModelCreateNestedOneInput,
+  ModelSelectInput,
+  ModelSelectNestedCountInput,
+  ModelSelectNestedInput,
+  ModelSelectNestedRequiredInput,
+  ModelUpdateInput,
+  ModelUpdateNestedManyInput,
+  ModelUpdateNestedOneInput,
+  ModelUpdateNestedOneRequiredInput,
+  PermissionsConfig,
+  PrismaTypeMap,
+  RecursiveContext,
+  RelationMetadata,
+} from "./types";
 import {
   generateImpossibleWhere,
-  getPrimaryKeyField,
+  getUniqueField,
   isObject,
   lowerFirst,
-  mapValues,
+  mapObjectValues,
   mergeWhere,
   mergeWhereUnique,
   pickByPath,
@@ -24,28 +42,13 @@ export class ModelResolver {
     protected checkRequiredBelongsTo: boolean,
   ) {}
 
-  protected async generateModelRelationsCount(modelName: string): Promise<Record<string, any>> {
-    const select: Record<string, any> = {};
-
-    for (const [fieldName, fieldDef] of Object.entries(this.fieldsMap[modelName])) {
-      if (fieldDef.kind === "object" && fieldDef.isList) {
-        const relationModelName = fieldDef.type;
-        const relationPermissions = this.permissionsConfig[relationModelName];
-
-        select[fieldName] = { where: await resolvePermissionDefinition(relationPermissions.read, this.context) };
-      }
-    }
-
-    return select;
-  }
-
   async resolveWhere(
-    permissionDefinition: boolean | Record<string, any> | ((context: unknown) => Record<string, any>),
+    permissionDefinition: boolean | Record<string, unknown> | ((context: unknown) => Record<string, unknown> | Promise<Record<string, unknown>>),
     modelName: string,
-    where: Record<string, any>,
+    where: Record<string, unknown> | undefined,
   ) {
     if (!permissionDefinition) {
-      return mergeWhere(where, generateImpossibleWhere(this.fieldsMap[modelName]));
+      return generateImpossibleWhere(this.fieldsMap[modelName]);
     } else if (permissionDefinition === true) {
       return where;
     } else {
@@ -54,9 +57,9 @@ export class ModelResolver {
   }
 
   async resolveWhereUnique(
-    permissionDefinition: boolean | Record<string, any> | ((context: unknown) => Record<string, any>),
+    permissionDefinition: boolean | Record<string, unknown> | ((context: unknown) => Record<string, unknown> | Promise<Record<string, unknown>>),
     modelName: string,
-    whereUnique: Record<string, any>,
+    whereUnique: Record<string, unknown>,
   ) {
     if (!permissionDefinition) {
       return mergeWhereUnique(this.fieldsMap[modelName], whereUnique, generateImpossibleWhere(this.fieldsMap[modelName]));
@@ -67,24 +70,44 @@ export class ModelResolver {
     }
   }
 
+  protected async generateModelRelationsCount(modelName: string): Promise<ModelSelectInput> {
+    const select: ModelSelectInput = {};
+
+    for (const [fieldName, fieldDef] of Object.entries(this.fieldsMap[modelName])) {
+      if (fieldDef.kind === "object" && fieldDef.isList) {
+        const relationModelName = fieldDef.type;
+        const relationPermissions = this.permissionsConfig[relationModelName];
+
+        if (!relationPermissions.read) {
+          select[fieldName] = false;
+        } else if (relationPermissions.read !== true) {
+          select[fieldName] = { where: await resolvePermissionDefinition(relationPermissions.read, this.context) };
+        } else {
+          select[fieldName] = true;
+        }
+      }
+    }
+
+    return select;
+  }
+
   protected async resolveRelationSelect(
     modelName: string,
-    select: Record<string, any>,
+    select: ModelSelectInput,
     relationsMetadata: RelationMetadata[],
     recursiveContext: RecursiveContext,
-  ): Promise<Record<string, any>> {
-    return mapValues(select, async (selectValue, selectName) => {
+  ): Promise<ModelSelectInput> {
+    return mapObjectValues(select, async ([selectName, selectValue]) => {
+      if (!selectValue) return selectValue;
+
       if (selectName === "_count") {
-        if (!selectValue) {
-          return selectValue;
-        } else if (selectValue !== true && selectValue.select) {
-          return {
-            select: await this.resolveRelationSelect(modelName, selectValue.select, relationsMetadata, { path: `${recursiveContext.path}._count` }),
-          };
+        const narrowedSelectValue = selectValue as true | ModelSelectNestedCountInput;
+
+        if (isObject(narrowedSelectValue) && isObject(narrowedSelectValue.select)) {
+          const countRecursiveContext = { path: `${recursiveContext.path}.${selectName}` };
+          return { select: await this.resolveRelationSelect(modelName, narrowedSelectValue.select, relationsMetadata, countRecursiveContext) };
         } else {
-          return {
-            select: this.generateModelRelationsCount(modelName),
-          };
+          return { select: await this.generateModelRelationsCount(modelName) };
         }
       }
 
@@ -101,11 +124,18 @@ export class ModelResolver {
       };
 
       if (!fieldDef.isList && fieldDef.isRequired) {
-        if (this.checkRequiredBelongsTo && relationPermissions.read !== true) {
-          const primaryKeyField = getPrimaryKeyField(relationFields);
+        const narrowedSelectValue = selectValue as true | ModelSelectNestedRequiredInput;
 
-          if (isObject(selectValue) && isObject(selectValue.select) && !selectValue.select[primaryKeyField.name] && !selectValue.include) {
-            throw new Error("You must select a primary key for the required belongs to relations");
+        if (this.checkRequiredBelongsTo && relationPermissions.read !== true) {
+          const uniqueField = getUniqueField(relationFields);
+
+          if (
+            isObject(narrowedSelectValue) &&
+            isObject(narrowedSelectValue.select) &&
+            !narrowedSelectValue.select[uniqueField.name] &&
+            !narrowedSelectValue.include
+          ) {
+            throw new Error("You must select a primary key or other unique field for the required belongs to relations");
           }
 
           relationsMetadata.push({
@@ -115,76 +145,84 @@ export class ModelResolver {
           });
         }
 
-        if (isObject(selectValue)) {
+        if (isObject(narrowedSelectValue)) {
           return {
-            ...selectValue,
+            ...narrowedSelectValue,
             ...(await this.resolveSelectAndInclude(
               relationModelName,
-              selectValue.select,
-              selectValue.include,
+              narrowedSelectValue.select,
+              narrowedSelectValue.include,
               relationsMetadata,
               relationRecursiveContext,
             )),
           };
         } else {
-          return selectValue;
+          return narrowedSelectValue;
         }
       }
 
+      const narrowedSelectValue = selectValue as true | ModelSelectNestedInput;
+
       if (!relationPermissions.read) {
         return { where: generateImpossibleWhere(relationFields) };
-      } else if (relationPermissions.read !== true && selectValue === true) {
-        return { where: await resolvePermissionDefinition(relationPermissions.read, this.context) };
-      } else if (relationPermissions.read !== true && selectValue !== false) {
-        const [selectAndInclude, permissionDefinition] = await Promise.all([
-          this.resolveSelectAndInclude(relationModelName, selectValue.select, selectValue.include, relationsMetadata, relationRecursiveContext),
-          resolvePermissionDefinition(relationPermissions.read, this.context),
-        ]);
+      } else if (relationPermissions.read !== true) {
+        if (isObject(narrowedSelectValue)) {
+          const [selectAndInclude, permissionDefinition] = await Promise.all([
+            this.resolveSelectAndInclude(
+              relationModelName,
+              narrowedSelectValue.select,
+              narrowedSelectValue.include,
+              relationsMetadata,
+              relationRecursiveContext,
+            ),
+            resolvePermissionDefinition(relationPermissions.read, this.context),
+          ]);
 
-        return {
-          ...selectValue,
-          ...selectAndInclude,
-          where: mergeWhere(selectValue.where, permissionDefinition),
-        };
-      } else if (isObject(selectValue)) {
-        return {
-          ...selectValue,
-          ...(await this.resolveSelectAndInclude(
-            relationModelName,
-            selectValue.select,
-            selectValue.include,
-            relationsMetadata,
-            relationRecursiveContext,
-          )),
-        };
+          return {
+            ...narrowedSelectValue,
+            ...selectAndInclude,
+            where: mergeWhere(narrowedSelectValue.where, permissionDefinition),
+          };
+        } else {
+          return { where: await resolvePermissionDefinition(relationPermissions.read, this.context) };
+        }
+      } else {
+        if (isObject(narrowedSelectValue)) {
+          return {
+            ...narrowedSelectValue,
+            ...(await this.resolveSelectAndInclude(
+              relationModelName,
+              narrowedSelectValue.select,
+              narrowedSelectValue.include,
+              relationsMetadata,
+              relationRecursiveContext,
+            )),
+          };
+        }
       }
 
-      return selectValue;
+      return narrowedSelectValue;
     });
   }
 
   async resolveSelectAndInclude(
     modelName: string,
-    select: Record<string, any> | undefined,
-    include: Record<string, any> | undefined,
+    select: ModelSelectInput | null | undefined,
+    include: ModelSelectInput | null | undefined,
     relationsMetadata: RelationMetadata[],
     recursiveContext: RecursiveContext,
-  ): Promise<Record<string, any>> {
+  ): Promise<Record<string, unknown>> {
     if (select) {
-      return {
-        select: await this.resolveRelationSelect(modelName, select, relationsMetadata, recursiveContext),
-      };
+      return { select: await this.resolveRelationSelect(modelName, select, relationsMetadata, recursiveContext) };
     } else if (include) {
-      return {
-        include: await this.resolveRelationSelect(modelName, include, relationsMetadata, recursiveContext),
-      };
+      return { include: await this.resolveRelationSelect(modelName, include, relationsMetadata, recursiveContext) };
     } else {
       return {};
     }
   }
 
-  async resolveCreate(modelName: string, data: Record<string, any>): Promise<Record<string, any>> {
-    return mapValues(data, async (dataValue, dataName) => {
+  async resolveCreate(modelName: string, data: ModelCreateInput): Promise<ModelCreateInput> {
+    return mapObjectValues(data, async ([dataName, dataValue]) => {
       const fieldDef = this.fieldsMap[modelName][dataName];
       if (fieldDef.kind !== "object") {
         return dataValue;
@@ -195,7 +233,9 @@ export class ModelResolver {
       const relationPermissions = this.permissionsConfig[relationModelName];
 
       if (fieldDef.isList) {
-        return mapValues(dataValue, async (actionValue, actionName) => {
+        return mapObjectValues(dataValue as ModelCreateNestedManyInput, async ([actionName, actionValue]) => {
+          if (!actionValue) return actionValue;
+
           switch (actionName) {
             case "create":
               if (!relationPermissions.create) {
@@ -213,32 +253,31 @@ export class ModelResolver {
             case "connectOrCreate":
               if (!relationPermissions.create) {
                 throw this.authorizationError;
-              } else if (!relationPermissions.read) {
-                return transformValue(actionValue, async (value) => {
-                  return {
-                    create: await this.resolveCreate(relationModelName, value.create),
-                    where: mergeWhereUnique(relationFields, value.where, generateImpossibleWhere(relationFields)),
-                  };
-                });
-              } else if (relationPermissions.read !== true) {
-                return transformValue(actionValue, async (value) => {
-                  const [create, permissionDefinition] = await Promise.all([
-                    this.resolveCreate(relationModelName, value.create),
-                    resolvePermissionDefinition(relationPermissions.read, this.context),
-                  ]);
-
-                  return {
-                    create,
-                    where: mergeWhereUnique(relationFields, value.where, permissionDefinition),
-                  };
-                });
               } else {
-                return transformValue(actionValue, async (value) => {
-                  return {
-                    create: await this.resolveCreate(relationModelName, value),
-                    where: value.where,
-                  };
-                });
+                if (!relationPermissions.read) {
+                  return transformValue(actionValue, async (value) => {
+                    return {
+                      create: await this.resolveCreate(relationModelName, value.create),
+                      where: mergeWhereUnique(relationFields, value.where, generateImpossibleWhere(relationFields)),
+                    };
+                  });
+                } else if (relationPermissions.read !== true) {
+                  const permissionDefinition = await resolvePermissionDefinition(relationPermissions.read, this.context);
+
+                  return transformValue(actionValue, async (value) => {
+                    return {
+                      create: await this.resolveCreate(relationModelName, value.create),
+                      where: mergeWhereUnique(relationFields, value.where, permissionDefinition),
+                    };
+                  });
+                } else {
+                  return transformValue(actionValue, async (value) => {
+                    return {
+                      create: await this.resolveCreate(relationModelName, value),
+                      where: value.where,
+                    };
+                  });
+                }
               }
             case "connect":
               if (!relationPermissions.read) {
@@ -246,19 +285,23 @@ export class ModelResolver {
                   return mergeWhereUnique(relationFields, value, generateImpossibleWhere(relationFields));
                 });
               } else if (relationPermissions.read !== true) {
+                const permissionDefinition = await resolvePermissionDefinition(relationPermissions.read, this.context);
+
                 return transformValue(actionValue, async (value) => {
-                  return mergeWhereUnique(relationFields, value, await resolvePermissionDefinition(relationPermissions.read, this.context));
+                  return mergeWhereUnique(relationFields, value, permissionDefinition);
                 });
               }
               break;
             default:
-              throw new Error("Not implemented");
+              throw new Error(`Failed to resolve the operation '${actionName}' in the nested create for a list relation`);
           }
 
           return actionValue;
         });
       } else {
-        return mapValues(dataValue, async (actionValue, actionName) => {
+        return mapObjectValues(dataValue as ModelCreateNestedOneInput, async ([actionName, actionValue]) => {
+          if (!actionValue) return actionValue;
+
           switch (actionName) {
             case "create":
               if (!relationPermissions.create) {
@@ -269,26 +312,28 @@ export class ModelResolver {
             case "connectOrCreate":
               if (!relationPermissions.create) {
                 throw this.authorizationError;
-              } else if (!relationPermissions.read) {
-                return {
-                  create: await this.resolveCreate(relationModelName, actionValue.create),
-                  where: mergeWhereUnique(relationFields, actionValue.where, generateImpossibleWhere(relationFields)),
-                };
-              } else if (relationPermissions.read !== true) {
-                const [create, permissionDefinition] = await Promise.all([
-                  this.resolveCreate(relationModelName, actionValue.create),
-                  resolvePermissionDefinition(relationPermissions.read, this.context),
-                ]);
-
-                return {
-                  create,
-                  where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
-                };
               } else {
-                return {
-                  create: await this.resolveCreate(relationModelName, actionValue.create),
-                  where: actionValue.where,
-                };
+                if (!relationPermissions.read) {
+                  return {
+                    create: await this.resolveCreate(relationModelName, actionValue.create),
+                    where: mergeWhereUnique(relationFields, actionValue.where, generateImpossibleWhere(relationFields)),
+                  };
+                } else if (relationPermissions.read !== true) {
+                  const [create, permissionDefinition] = await Promise.all([
+                    this.resolveCreate(relationModelName, actionValue.create),
+                    resolvePermissionDefinition(relationPermissions.read, this.context),
+                  ]);
+
+                  return {
+                    create,
+                    where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
+                  };
+                } else {
+                  return {
+                    create: await this.resolveCreate(relationModelName, actionValue.create),
+                    where: actionValue.where,
+                  };
+                }
               }
             case "connect":
               if (!relationPermissions.read) {
@@ -298,7 +343,7 @@ export class ModelResolver {
               }
               break;
             default:
-              throw new Error("Not implemented");
+              throw new Error(`Failed to resolve the operation '${actionName}' in the nested create for a non-list relation`);
           }
 
           return actionValue;
@@ -307,8 +352,8 @@ export class ModelResolver {
     });
   }
 
-  async resolveUpdate(modelName: string, data: Record<string, any>): Promise<Record<string, any>> {
-    return mapValues(data, async (dataValue, dataName) => {
+  async resolveUpdate(modelName: string, data: ModelUpdateInput): Promise<ModelUpdateInput> {
+    return mapObjectValues(data, async ([dataName, dataValue]) => {
       const fieldDef = this.fieldsMap[modelName][dataName];
       if (fieldDef.kind !== "object") {
         return dataValue;
@@ -319,7 +364,9 @@ export class ModelResolver {
       const relationPermissions = this.permissionsConfig[relationModelName];
 
       if (fieldDef.isList) {
-        return mapValues(dataValue, async (actionValue, actionName) => {
+        return mapObjectValues(dataValue as ModelUpdateNestedManyInput, async ([actionName, actionValue]) => {
+          if (!actionValue) return actionValue;
+
           switch (actionName) {
             case "create":
               if (!relationPermissions.create) {
@@ -337,32 +384,31 @@ export class ModelResolver {
             case "connectOrCreate":
               if (!relationPermissions.create) {
                 throw this.authorizationError;
-              } else if (!relationPermissions.read) {
-                return transformValue(actionValue, async (value) => {
-                  return {
-                    create: await this.resolveCreate(relationModelName, value.create),
-                    where: mergeWhereUnique(relationFields, value.where, generateImpossibleWhere(relationFields)),
-                  };
-                });
-              } else if (relationPermissions.read !== true) {
-                return transformValue(actionValue, async (value) => {
-                  const [create, permissionDefinition] = await Promise.all([
-                    this.resolveCreate(relationModelName, value.create),
-                    resolvePermissionDefinition(relationPermissions.read, this.context),
-                  ]);
-
-                  return {
-                    create,
-                    where: mergeWhereUnique(relationFields, value.where, permissionDefinition),
-                  };
-                });
               } else {
-                return transformValue(actionValue, async (value) => {
-                  return {
-                    create: await this.resolveCreate(relationModelName, value.create),
-                    where: value.where,
-                  };
-                });
+                if (!relationPermissions.read) {
+                  return transformValue(actionValue, async (value) => {
+                    return {
+                      create: await this.resolveCreate(relationModelName, value.create),
+                      where: mergeWhereUnique(relationFields, value.where, generateImpossibleWhere(relationFields)),
+                    };
+                  });
+                } else if (relationPermissions.read !== true) {
+                  const permissionDefinition = await resolvePermissionDefinition(relationPermissions.read, this.context);
+
+                  return transformValue(actionValue, async (value) => {
+                    return {
+                      create: await this.resolveCreate(relationModelName, value.create),
+                      where: mergeWhereUnique(relationFields, value.where, permissionDefinition),
+                    };
+                  });
+                } else {
+                  return transformValue(actionValue, async (value) => {
+                    return {
+                      create: await this.resolveCreate(relationModelName, value.create),
+                      where: value.where,
+                    };
+                  });
+                }
               }
             case "set":
             case "connect":
@@ -372,8 +418,10 @@ export class ModelResolver {
                   return mergeWhereUnique(relationFields, value, generateImpossibleWhere(relationFields));
                 });
               } else if (relationPermissions.read !== true) {
+                const permissionDefinition = await resolvePermissionDefinition(relationPermissions.read, this.context);
+
                 return transformValue(actionValue, async (value) => {
-                  return mergeWhereUnique(relationFields, value, await resolvePermissionDefinition(relationPermissions.read, this.context));
+                  return mergeWhereUnique(relationFields, value, permissionDefinition);
                 });
               }
               break;
@@ -381,14 +429,11 @@ export class ModelResolver {
               if (!relationPermissions.update) {
                 throw this.authorizationError;
               } else if (relationPermissions.update !== true) {
-                return transformValue(actionValue, async (value) => {
-                  const [data, permissionDefinition] = await Promise.all([
-                    this.resolveUpdate(relationModelName, value.data),
-                    resolvePermissionDefinition(relationPermissions.update, this.context),
-                  ]);
+                const permissionDefinition = await resolvePermissionDefinition(relationPermissions.update, this.context);
 
+                return transformValue(actionValue, async (value) => {
                   return {
-                    data,
+                    data: await this.resolveUpdate(relationModelName, value.data),
                     where: mergeWhereUnique(relationFields, value.where, permissionDefinition),
                   };
                 });
@@ -404,10 +449,12 @@ export class ModelResolver {
               if (!relationPermissions.update) {
                 throw this.authorizationError;
               } else if (relationPermissions.update !== true) {
+                const permissionDefinition = await resolvePermissionDefinition(relationPermissions.update, this.context);
+
                 return transformValue(actionValue, async (value) => {
                   return {
                     data: value.data,
-                    where: mergeWhere(value.where, await resolvePermissionDefinition(relationPermissions.update, this.context)),
+                    where: mergeWhere(value.where, permissionDefinition),
                   };
                 });
               }
@@ -416,11 +463,12 @@ export class ModelResolver {
               if (!relationPermissions.create || !relationPermissions.update) {
                 throw this.authorizationError;
               } else if (relationPermissions.update !== true) {
+                const permissionDefinition = await resolvePermissionDefinition(relationPermissions.update, this.context);
+
                 return transformValue(actionValue, async (value) => {
-                  const [create, update, permissionDefinition] = await Promise.all([
+                  const [create, update] = await Promise.all([
                     this.resolveCreate(relationModelName, value.create),
                     this.resolveUpdate(relationModelName, value.update),
-                    resolvePermissionDefinition(relationPermissions.update, this.context),
                   ]);
 
                   return {
@@ -443,8 +491,10 @@ export class ModelResolver {
               if (!relationPermissions.delete) {
                 throw this.authorizationError;
               } else if (relationPermissions.delete !== true) {
+                const permissionDefinition = await resolvePermissionDefinition(relationPermissions.delete, this.context);
+
                 return transformValue(actionValue, async (value) => {
-                  return mergeWhereUnique(relationFields, value, await resolvePermissionDefinition(relationPermissions.delete, this.context));
+                  return mergeWhereUnique(relationFields, value, permissionDefinition);
                 });
               }
               break;
@@ -452,19 +502,23 @@ export class ModelResolver {
               if (!relationPermissions.delete) {
                 throw this.authorizationError;
               } else if (relationPermissions.delete !== true) {
+                const permissionDefinition = await resolvePermissionDefinition(relationPermissions.delete, this.context);
+
                 return transformValue(actionValue, async (value) => {
-                  return mergeWhere(value, await resolvePermissionDefinition(relationPermissions.delete, this.context));
+                  return mergeWhere(value, permissionDefinition);
                 });
               }
               break;
             default:
-              throw new Error("Not implemented");
+              throw new Error(`Failed to resolve the operation '${actionName}' in the nested update for a list relation`);
           }
 
           return actionValue;
         });
       } else {
-        return mapValues(dataValue, async (actionValue, actionName) => {
+        return mapObjectValues(dataValue as ModelUpdateNestedOneInput & ModelUpdateNestedOneRequiredInput, async ([actionName, actionValue]) => {
+          if (!actionValue) return actionValue;
+
           switch (actionName) {
             case "create":
               if (!relationPermissions.create) {
@@ -475,26 +529,28 @@ export class ModelResolver {
             case "connectOrCreate":
               if (!relationPermissions.create) {
                 throw this.authorizationError;
-              } else if (!relationPermissions.read) {
-                return {
-                  create: await this.resolveCreate(relationModelName, actionValue.create),
-                  where: mergeWhereUnique(relationFields, actionValue.where, generateImpossibleWhere(relationFields)),
-                };
-              } else if (relationPermissions.read !== true) {
-                const [create, permissionDefinition] = await Promise.all([
-                  this.resolveCreate(relationModelName, actionValue.create),
-                  resolvePermissionDefinition(relationPermissions.read, this.context),
-                ]);
-
-                return {
-                  create,
-                  where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
-                };
               } else {
-                return {
-                  create: await this.resolveCreate(relationModelName, actionValue.create),
-                  where: actionValue.where,
-                };
+                if (!relationPermissions.read) {
+                  return {
+                    create: await this.resolveCreate(relationModelName, actionValue.create),
+                    where: mergeWhereUnique(relationFields, actionValue.where, generateImpossibleWhere(relationFields)),
+                  };
+                } else if (relationPermissions.read !== true) {
+                  const [create, permissionDefinition] = await Promise.all([
+                    this.resolveCreate(relationModelName, actionValue.create),
+                    resolvePermissionDefinition(relationPermissions.read, this.context),
+                  ]);
+
+                  return {
+                    create,
+                    where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
+                  };
+                } else {
+                  return {
+                    create: await this.resolveCreate(relationModelName, actionValue.create),
+                    where: actionValue.where,
+                  };
+                }
               }
             case "connect":
               if (!relationPermissions.read) {
@@ -505,71 +561,79 @@ export class ModelResolver {
               break;
             case "disconnect":
               if (!relationPermissions.read) {
-                return mergeWhere(actionValue, generateImpossibleWhere(relationFields));
-              } else if (relationPermissions.read !== true && actionValue === true) {
-                return resolvePermissionDefinition(relationPermissions.read, this.context);
-              } else if (relationPermissions.read !== true && actionValue !== true) {
-                return mergeWhere(actionValue, await resolvePermissionDefinition(relationPermissions.read, this.context));
+                return generateImpossibleWhere(relationFields);
+              } else if (relationPermissions.read !== true) {
+                if (isObject(actionValue)) {
+                  return mergeWhere(actionValue, await resolvePermissionDefinition(relationPermissions.read, this.context));
+                } else {
+                  return resolvePermissionDefinition(relationPermissions.read, this.context);
+                }
               }
               break;
             case "update":
               if (!relationPermissions.update) {
                 throw this.authorizationError;
-              } else if (relationPermissions.update !== true && !actionValue.hasOwnProperty("data")) {
-                const [data, where] = await Promise.all([
-                  this.resolveUpdate(relationModelName, actionValue),
-                  resolvePermissionDefinition(relationPermissions.update, this.context),
-                ]);
-
-                return { data, where };
-              } else if (relationPermissions.update !== true && !actionValue.where) {
-                const [data, where] = await Promise.all([
-                  this.resolveUpdate(relationModelName, actionValue.data),
-                  resolvePermissionDefinition(relationPermissions.update, this.context),
-                ]);
-
-                return { data, where };
               } else if (relationPermissions.update !== true) {
-                const [data, permissionDefinition] = await Promise.all([
-                  this.resolveUpdate(relationModelName, actionValue.data),
-                  resolvePermissionDefinition(relationPermissions.update, this.context),
-                ]);
+                if (!actionValue.data) {
+                  const [data, where] = await Promise.all([
+                    this.resolveUpdate(relationModelName, actionValue),
+                    resolvePermissionDefinition(relationPermissions.update, this.context),
+                  ]);
 
-                return {
-                  data,
-                  where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
-                };
-              } else if (!actionValue.hasOwnProperty("data")) {
-                return this.resolveUpdate(relationModelName, actionValue);
+                  return { data, where };
+                } else if (!actionValue.where) {
+                  const [data, where] = await Promise.all([
+                    this.resolveUpdate(relationModelName, actionValue.data),
+                    resolvePermissionDefinition(relationPermissions.update, this.context),
+                  ]);
+
+                  return { data, where };
+                } else {
+                  const [data, permissionDefinition] = await Promise.all([
+                    this.resolveUpdate(relationModelName, actionValue.data),
+                    resolvePermissionDefinition(relationPermissions.update, this.context),
+                  ]);
+
+                  return {
+                    data,
+                    where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
+                  };
+                }
               } else {
-                return {
-                  data: await this.resolveUpdate(relationModelName, actionValue.data),
-                  where: actionValue.where,
-                };
+                if (!actionValue.data) {
+                  return this.resolveUpdate(relationModelName, actionValue);
+                } else {
+                  return {
+                    data: await this.resolveUpdate(relationModelName, actionValue.data),
+                    where: actionValue.where,
+                  };
+                }
               }
             case "upsert":
               if (!relationPermissions.create || !relationPermissions.update) {
                 throw this.authorizationError;
-              } else if (relationPermissions.update !== true && !actionValue.where) {
-                const [create, update, where] = await Promise.all([
-                  this.resolveCreate(relationModelName, actionValue.create),
-                  this.resolveUpdate(relationModelName, actionValue.update),
-                  resolvePermissionDefinition(relationPermissions.update, this.context),
-                ]);
-
-                return { create, update, where };
               } else if (relationPermissions.update !== true) {
-                const [create, update, permissionDefinition] = await Promise.all([
-                  this.resolveCreate(relationModelName, actionValue.create),
-                  this.resolveUpdate(relationModelName, actionValue.update),
-                  resolvePermissionDefinition(relationPermissions.update, this.context),
-                ]);
+                if (!actionValue.where) {
+                  const [create, update, where] = await Promise.all([
+                    this.resolveCreate(relationModelName, actionValue.create),
+                    this.resolveUpdate(relationModelName, actionValue.update),
+                    resolvePermissionDefinition(relationPermissions.update, this.context),
+                  ]);
 
-                return {
-                  create,
-                  update,
-                  where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
-                };
+                  return { create, update, where };
+                } else {
+                  const [create, update, permissionDefinition] = await Promise.all([
+                    this.resolveCreate(relationModelName, actionValue.create),
+                    this.resolveUpdate(relationModelName, actionValue.update),
+                    resolvePermissionDefinition(relationPermissions.update, this.context),
+                  ]);
+
+                  return {
+                    create,
+                    update,
+                    where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
+                  };
+                }
               } else {
                 const [create, update] = await Promise.all([
                   this.resolveCreate(relationModelName, actionValue.create),
@@ -581,14 +645,16 @@ export class ModelResolver {
             case "delete":
               if (!relationPermissions.delete) {
                 throw this.authorizationError;
-              } else if (relationPermissions.delete !== true && actionValue === true) {
-                return resolvePermissionDefinition(relationPermissions.delete, this.context);
-              } else if (relationPermissions.delete !== true && actionValue !== true) {
-                return mergeWhere(actionValue, await resolvePermissionDefinition(relationPermissions.delete, this.context));
+              } else if (relationPermissions.delete !== true) {
+                if (isObject(actionValue)) {
+                  return mergeWhere(actionValue, await resolvePermissionDefinition(relationPermissions.delete, this.context));
+                } else {
+                  return resolvePermissionDefinition(relationPermissions.delete, this.context);
+                }
               }
               break;
             default:
-              throw new Error("Not implemented");
+              throw new Error(`Failed to resolve the operation '${actionName}' in the nested update for a non-list relation`);
           }
 
           return actionValue;
@@ -599,9 +665,9 @@ export class ModelResolver {
 
   async performRelationProcessing(
     transactionClient: Prisma.TransactionClient,
-    result: any | any[],
+    result: unknown,
     relationsMetadata: RelationMetadata[],
-  ): Promise<void> {
+  ): Promise<unknown> {
     for (const relationMetadata of relationsMetadata) {
       switch (relationMetadata.type) {
         case "requiredBelongsTo":
@@ -613,28 +679,28 @@ export class ModelResolver {
           const relationPermissions = this.permissionsConfig[relationMetadata.modelName];
 
           if (!relationPermissions.read) {
-            throw new Error("Referential integrity violation");
+            throw new ReferentialIntegrityError();
           } else if (relationPermissions.read === true) {
             continue;
           }
 
-          const primaryKeyField = getPrimaryKeyField(this.fieldsMap[relationMetadata.modelName]);
-          const primaryKeys = uniqueArray(matchingRelations.map((relation) => relation[primaryKeyField.name]));
+          const uniqueField = getUniqueField(this.fieldsMap[relationMetadata.modelName]);
+          const uniqueFieldValues = uniqueArray(matchingRelations.map((relation) => relation[uniqueField.name]));
 
           const allowedCount = await transactionClient[lowerFirst(relationMetadata.modelName)].count({
             where: mergeWhere(
-              { [primaryKeyField.name]: { in: primaryKeys } },
+              { [uniqueField.name]: { in: uniqueFieldValues } },
               await resolvePermissionDefinition(relationPermissions.read, this.context),
             ),
           });
 
-          if (primaryKeys.length !== allowedCount) {
-            throw new Error("Referential integrity violation");
+          if (uniqueFieldValues.length !== allowedCount) {
+            throw new ReferentialIntegrityError();
           }
 
           break;
         default:
-          throw new Error("Not implemented");
+          throw new Error(`Failed to resolve the relation metadata type '${relationMetadata.type}' during relation processing`);
       }
     }
 

@@ -1,2 +1,3 @@
+export { AuthorizationError, ReferentialIntegrityError } from "./errors";
 export { createRlsExtension } from "./extension";
-export { ModelPermissionsConfig, PermissionsConfig, PrismaModelWhere, PrismaModelWhereResolver } from "./types";
+export { PermissionsConfig, ModelPermissionsConfig, PermissionDefinition, PrismaModelWhere, PrismaModelWhereResolver } from "./types";
