@@ -1,9 +1,8 @@
 import type { Prisma, PrismaClientExtends } from "@prisma/client/extension";
-import type { BaseDMMF, DMMF } from "@prisma/client/runtime/library";
 
-import { AllOperationsArgs, FieldsMap, ObjectEntry } from "./types";
+import { AllOperationsArgs, DMMF,DMMFField, FieldsMap, ObjectEntry } from "./types";
 
-export function buildFieldsMap(dmmf: BaseDMMF): FieldsMap {
+export function buildFieldsMap(dmmf: DMMF): FieldsMap {
   const fieldsMap: FieldsMap = {};
 
   for (const model of dmmf.datamodel.models) {
@@ -26,7 +25,7 @@ export function getTransactionClient(prismaClient: PrismaClientExtends, allOpera
   return prismaClient;
 }
 
-export function generateImpossibleWhere(fields: Record<string, DMMF.Field>): Record<string, unknown> {
+export function generateImpossibleWhere(fields: Record<string, DMMFField>): Record<string, unknown> {
   const uniqueField = getUniqueField(fields);
 
   switch (uniqueField.type) {
@@ -63,11 +62,11 @@ export async function resolvePermissionDefinition(
   return isFunction(permissionDefinition) ? permissionDefinition(context) : permissionDefinition;
 }
 
-export function isUniqueField(fieldDef: DMMF.Field): boolean {
+export function isUniqueField(fieldDef: DMMFField): boolean {
   return fieldDef.isId || fieldDef.isUnique;
 }
 
-export function getUniqueField(fields: Record<string, DMMF.Field>): DMMF.Field {
+export function getUniqueField(fields: Record<string, DMMFField>): DMMFField {
   const fieldDef = Object.values(fields).find(isUniqueField);
   if (!fieldDef) {
     throw new Error("Couldn't find primary key or other unique field");
@@ -81,7 +80,7 @@ export function mergeWhere(first: Record<string, unknown> | undefined, second: R
 }
 
 export function mergeWhereUnique(
-  fields: Record<string, DMMF.Field>,
+  fields: Record<string, DMMFField>,
   firstUnique: Record<string, unknown>,
   second: Record<string, unknown>,
 ): Record<string, unknown> {
