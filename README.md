@@ -152,3 +152,26 @@ Alternatively, you can consider the following options:
 
 - Make them optional - keep the foreign keys required but define the relationships as optional
 - Handle at the policy level - apply consistent policy filters to restrict access to both sides of relation
+
+### Edge runtime
+
+When prisma is built for edge runtimes such as cloudflare workers, it no longer exposes the `dmmf` property. To work around this, you can use the [Pothos generator](https://pothos-graphql.dev/docs/plugins/prisma/setup#edge-run-times) to generate a compatible datamodel.
+
+```prisma
+generator pothos {
+  provider          = "prisma-pothos-types"
+  clientOutput      = "@prisma/client"
+  output            = "./pothos-types.ts"
+  generateDatamodel = true
+}
+```
+
+The only change you need to make is replacing the `dmmf` property source, everything else remains the same:
+
+```typescript
+import { getDatamodel } from '@pothos/plugin-prisma/generated';
+
+const rlsExtension = createRlsExtension({
+  dmmf: getDatamodel(),
+});
+```

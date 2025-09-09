@@ -1,4 +1,8 @@
-import type { BaseDMMF, DMMF } from "@prisma/client/runtime/library";
+import type { BaseDMMF } from "@prisma/client/runtime/library";
+
+export type DMMF = { datamodel: Pick<BaseDMMF["datamodel"], "models"> };
+
+export type DMMFField = DMMF["datamodel"]["models"][number]["fields"][number];
 
 export type PrismaTypeMap = { model: Record<string, { operations: { findMany: { args: { where?: Record<string, any> } } } }> };
 
@@ -8,28 +12,28 @@ export type PrismaModelWhere<TypeMap extends PrismaTypeMap, ModelName extends Pr
   TypeMap["model"][ModelName]["operations"]["findMany"]["args"]["where"]
 >;
 
-export type PrismaModelWhereResolver<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>, Context extends unknown> = (
+export type PrismaModelWhereResolver<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>, Context> = (
   context: Context,
 ) => PrismaModelWhere<TypeMap, ModelName> | Promise<PrismaModelWhere<TypeMap, ModelName>>;
 
-export type PermissionDefinition<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>, Context extends unknown> =
+export type PermissionDefinition<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>, Context> =
   | boolean
   | PrismaModelWhere<TypeMap, ModelName>
   | PrismaModelWhereResolver<TypeMap, ModelName, Context>;
 
-export type ModelPermissionsConfig<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>, Context extends unknown> = {
+export type ModelPermissionsConfig<TypeMap extends PrismaTypeMap, ModelName extends PrismaModelName<TypeMap>, Context> = {
   read: PermissionDefinition<TypeMap, ModelName, Context>;
   create: boolean;
   update: PermissionDefinition<TypeMap, ModelName, Context>;
   delete: PermissionDefinition<TypeMap, ModelName, Context>;
 };
 
-export type PermissionsConfig<TypeMap extends PrismaTypeMap, Context extends unknown> = {
+export type PermissionsConfig<TypeMap extends PrismaTypeMap, Context> = {
   [ModelName in PrismaModelName<TypeMap>]: ModelPermissionsConfig<TypeMap, ModelName, Context>;
 };
 
 export type ExtensionOptions = {
-  dmmf: BaseDMMF;
+  dmmf: DMMF;
   permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>;
   context: unknown;
   authorizationError?: Error;
@@ -56,7 +60,7 @@ export type AllOperationsArgs = { model: PrismaModelName<PrismaTypeMap> } & (
   | { operation: ""; args: Record<string, unknown>; query: (args: Record<string, any>) => Promise<unknown> } // TODO: find better way
 );
 
-export type FieldsMap = Record<string, Record<string, DMMF.Field>>;
+export type FieldsMap = Record<string, Record<string, DMMFField>>;
 
 export type RelationMetadata = {
   type: "requiredBelongsTo";
