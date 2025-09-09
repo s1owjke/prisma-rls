@@ -2,8 +2,6 @@
 
 [![Published on npm](https://img.shields.io/npm/v/prisma-rls?color=brightgreen)](https://www.npmjs.com/package/prisma-rls) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-> 🚧 The package is currently under active development, so it's not recommended for production
-
 Row-Level Security (RLS) traditionally requires databases with native support and custom security policies for each table.
 
 This library provides an alternative: a Prisma client extension that automatically adds "where" clauses to all model queries. This method works without database-side RLS support (e.g., in MySQL).
