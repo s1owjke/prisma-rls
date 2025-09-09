@@ -119,6 +119,13 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
 
                 return query(args);
               }
+              case "createManyAndReturn": {
+                if (!modelPermissions.create) {
+                  throw authorizationError;
+                }
+
+                return query(args);
+              }
               case "update": {
                 if (!modelPermissions.update) {
                   throw authorizationError;

@@ -47,6 +47,7 @@ export type AllOperationsArgs = { model: PrismaModelName<PrismaTypeMap> } & (
   | { operation: "groupBy"; args: ModelGroupByArgs; query: (args: ModelGroupByArgs) => Promise<unknown> }
   | { operation: "create"; args: ModelCreateArgs; query: (args: ModelCreateArgs) => Promise<unknown> }
   | { operation: "createMany"; args: ModelCreateManyArgs; query: (args: ModelCreateManyArgs) => Promise<unknown> }
+  | { operation: "createManyAndReturn"; args: ModelCreateManyAndReturnArgs; query: (args: Record<string, unknown>) => Promise<unknown> }
   | { operation: "update"; args: ModelUpdateArgs; query: (args: ModelUpdateArgs) => Promise<unknown> }
   | { operation: "updateMany"; args: ModelUpdateManyArgs; query: (args: ModelUpdateManyArgs) => Promise<unknown> }
   | { operation: "upsert"; args: ModelUpsertArgs; query: (args: ModelUpsertArgs) => Promise<unknown> }
@@ -229,6 +230,12 @@ export type ModelCreateArgs = {
 };
 
 export type ModelCreateManyArgs = {
+  data: ModelCreateManyInput | ModelCreateManyInput[];
+  skipDuplicates?: boolean;
+};
+
+export type ModelCreateManyAndReturnArgs = {
+  select?: Record<string, boolean> | null;
   data: ModelCreateManyInput | ModelCreateManyInput[];
   skipDuplicates?: boolean;
 };
