@@ -41,4 +41,24 @@ describe("model creating", () => {
       });
     });
   });
+
+  describe("create many and return", () => {
+    test("if create is denied it throw an error", async () => {
+      const db = resolveDb();
+
+      await executeAndRollback(db, async (tx) => {
+        const user = tx.user.createManyAndReturn({ data: { email: "shawn.hudson@test.local", name: "Shawn Hudson" } });
+        await expect(user).rejects.toThrowError(AuthorizationError);
+      });
+    });
+
+    test("if create is allowed it allows to create", async () => {
+      const db = resolveDb({ User: { create: true } });
+
+      await executeAndRollback(db, async (tx) => {
+        const users = tx.user.createManyAndReturn({ data: { email: "shawn.hudson@test.local", name: "Shawn Hudson" } });
+        await expect(users).resolves.toMatchObject([{ email: "shawn.hudson@test.local", name: "Shawn Hudson" }]);
+      });
+    });
+  });
 });
