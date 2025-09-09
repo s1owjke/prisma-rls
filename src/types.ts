@@ -1,5 +1,9 @@
 import type { BaseDMMF } from "@prisma/client/runtime/library";
 
+export type DMMF = { datamodel: Pick<BaseDMMF["datamodel"], "models"> };
+
+export type DMMFField = DMMF["datamodel"]["models"][number]["fields"][number];
+
 export type PrismaTypeMap = { model: Record<string, { operations: { findMany: { args: { where?: Record<string, any> } } } }> };
 
 export type PrismaModelName<TypeMap extends PrismaTypeMap> = keyof TypeMap["model"];
@@ -27,9 +31,6 @@ export type ModelPermissionsConfig<TypeMap extends PrismaTypeMap, ModelName exte
 export type PermissionsConfig<TypeMap extends PrismaTypeMap, Context> = {
   [ModelName in PrismaModelName<TypeMap>]: ModelPermissionsConfig<TypeMap, ModelName, Context>;
 };
-
-export type DMMF = { datamodel: Pick<BaseDMMF["datamodel"], "models"> };
-export type DMMFField = DMMF["datamodel"]["models"][number]["fields"][number];
 
 export type ExtensionOptions = {
   dmmf: DMMF;
