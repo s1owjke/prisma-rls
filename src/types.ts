@@ -1,6 +1,21 @@
-import type { BaseDMMF } from "@prisma/client/runtime/library";
+import { ReadonlyDeep } from "@prisma/client/runtime/library";
 
-export type DMMF = { datamodel: Pick<BaseDMMF["datamodel"], "models"> };
+export type DMMF = ReadonlyDeep<{
+  datamodel: {
+    models: {
+      name: string;
+      fields: {
+        kind: string;
+        name: string;
+        isRequired: boolean;
+        isList: boolean;
+        isUnique: boolean;
+        isId: boolean;
+        type: string;
+      }[];
+    }[];
+  };
+}>;
 
 export type DMMFField = DMMF["datamodel"]["models"][number]["fields"][number];
 

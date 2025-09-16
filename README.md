@@ -167,9 +167,13 @@ generator pothos {
 The only change you need to make is replacing the `dmmf` property source, everything else remains the same:
 
 ```typescript
-import { getDatamodel } from '@pothos/plugin-prisma/generated';
+import { getDatamodel } from "@pothos/plugin-prisma/generated";
 
 const rlsExtension = createRlsExtension({
-  dmmf: getDatamodel(),
+  dmmf: {
+    datamodel: {
+      models: Object.entries(getDatamodel()["datamodel"]["models"]).map(([name, model]) => ({ ...model, name })),
+    },
+  },
 });
 ```
