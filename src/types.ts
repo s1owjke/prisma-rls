@@ -13,11 +13,14 @@ export type DMMF = ReadonlyDeep<{
         isId: boolean;
         type: string;
       }[];
+      uniqueFields: string[][];
     }[];
   };
 }>;
 
 export type DMMFField = DMMF["datamodel"]["models"][number]["fields"][number];
+
+export type DMMFUniqueField = string[];
 
 export type PrismaTypeMap = { model: Record<string, { operations: { findMany: { args: { where?: Record<string, any> } } } }> };
 
@@ -76,6 +79,8 @@ export type AllOperationsArgs = { model: PrismaModelName<PrismaTypeMap> } & (
 );
 
 export type FieldsMap = Record<string, Record<string, DMMFField>>;
+
+export type UniqueFieldsMap = Record<string, DMMFUniqueField>;
 
 export type RelationMetadata = {
   type: "requiredBelongsTo";

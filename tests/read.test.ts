@@ -21,6 +21,12 @@ describe("model reading", () => {
       const user = db.user.findUnique({ where: { id: 1 } });
       await expect(user).resolves.toEqual(null);
     });
+
+    test("if read is where with compound unique it return filtered result", async () => {
+      const db = resolveDb({ Post: { read: true } });
+      const post = db.post.findUnique({ where: { title_categoryId: { title: "Quick bites", categoryId: 1 } } });
+      await expect(post).resolves.toMatchObject({ id: 1 });
+    });
   });
 
   describe("find unique or throw", () => {

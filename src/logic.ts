@@ -18,6 +18,7 @@ import type {
   PrismaTypeMap,
   RecursiveContext,
   RelationMetadata,
+  UniqueFieldsMap,
 } from "./types";
 import {
   generateImpossibleWhere,
@@ -38,6 +39,7 @@ export class ModelResolver {
     protected permissionsConfig: PermissionsConfig<PrismaTypeMap, unknown>,
     protected context: unknown,
     protected fieldsMap: FieldsMap,
+    protected uniqueFieldsMap: UniqueFieldsMap,
     protected authorizationError: Error,
     protected checkRequiredBelongsTo: boolean,
   ) {}
@@ -62,11 +64,21 @@ export class ModelResolver {
     whereUnique: Record<string, unknown>,
   ) {
     if (!permissionDefinition) {
-      return mergeWhereUnique(this.fieldsMap[modelName], whereUnique, generateImpossibleWhere(this.fieldsMap[modelName]));
+      return mergeWhereUnique(
+        this.fieldsMap[modelName],
+        this.uniqueFieldsMap[modelName],
+        whereUnique,
+        generateImpossibleWhere(this.fieldsMap[modelName]),
+      );
     } else if (permissionDefinition === true) {
       return whereUnique;
     } else {
-      return mergeWhereUnique(this.fieldsMap[modelName], whereUnique, await resolvePermissionDefinition(permissionDefinition, this.context));
+      return mergeWhereUnique(
+        this.fieldsMap[modelName],
+        this.uniqueFieldsMap[modelName],
+        whereUnique,
+        await resolvePermissionDefinition(permissionDefinition, this.context),
+      );
     }
   }
 
@@ -231,6 +243,7 @@ export class ModelResolver {
       const relationModelName = fieldDef.type;
       const relationFields = this.fieldsMap[relationModelName];
       const relationPermissions = this.permissionsConfig[relationModelName];
+      const uniqueFields = this.uniqueFieldsMap[relationModelName];
 
       if (fieldDef.isList) {
         return mapObjectValues(dataValue as ModelCreateNestedManyInput, async ([actionName, actionValue]) => {
@@ -258,7 +271,7 @@ export class ModelResolver {
                   return transformValue(actionValue, async (value) => {
                     return {
                       create: await this.resolveCreate(relationModelName, value.create),
-                      where: mergeWhereUnique(relationFields, value.where, generateImpossibleWhere(relationFields)),
+                      where: mergeWhereUnique(relationFields, uniqueFields, value.where, generateImpossibleWhere(relationFields)),
                     };
                   });
                 } else if (relationPermissions.read !== true) {
@@ -267,7 +280,7 @@ export class ModelResolver {
                   return transformValue(actionValue, async (value) => {
                     return {
                       create: await this.resolveCreate(relationModelName, value.create),
-                      where: mergeWhereUnique(relationFields, value.where, permissionDefinition),
+                      where: mergeWhereUnique(relationFields, uniqueFields, value.where, permissionDefinition),
                     };
                   });
                 } else {
@@ -282,13 +295,13 @@ export class ModelResolver {
             case "connect":
               if (!relationPermissions.read) {
                 return transformValue(actionValue, async (value) => {
-                  return mergeWhereUnique(relationFields, value, generateImpossibleWhere(relationFields));
+                  return mergeWhereUnique(relationFields, uniqueFields, value, generateImpossibleWhere(relationFields));
                 });
               } else if (relationPermissions.read !== true) {
                 const permissionDefinition = await resolvePermissionDefinition(relationPermissions.read, this.context);
 
                 return transformValue(actionValue, async (value) => {
-                  return mergeWhereUnique(relationFields, value, permissionDefinition);
+                  return mergeWhereUnique(relationFields, uniqueFields, value, permissionDefinition);
                 });
               }
               break;
@@ -316,7 +329,7 @@ export class ModelResolver {
                 if (!relationPermissions.read) {
                   return {
                     create: await this.resolveCreate(relationModelName, actionValue.create),
-                    where: mergeWhereUnique(relationFields, actionValue.where, generateImpossibleWhere(relationFields)),
+                    where: mergeWhereUnique(relationFields, uniqueFields, actionValue.where, generateImpossibleWhere(relationFields)),
                   };
                 } else if (relationPermissions.read !== true) {
                   const [create, permissionDefinition] = await Promise.all([
@@ -326,7 +339,7 @@ export class ModelResolver {
 
                   return {
                     create,
-                    where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
+                    where: mergeWhereUnique(relationFields, uniqueFields, actionValue.where, permissionDefinition),
                   };
                 } else {
                   return {
@@ -337,9 +350,14 @@ export class ModelResolver {
               }
             case "connect":
               if (!relationPermissions.read) {
-                return mergeWhereUnique(relationFields, actionValue, generateImpossibleWhere(relationFields));
+                return mergeWhereUnique(relationFields, uniqueFields, actionValue, generateImpossibleWhere(relationFields));
               } else if (relationPermissions.read !== true) {
-                return mergeWhereUnique(relationFields, actionValue, await resolvePermissionDefinition(relationPermissions.read, this.context));
+                return mergeWhereUnique(
+                  relationFields,
+                  uniqueFields,
+                  actionValue,
+                  await resolvePermissionDefinition(relationPermissions.read, this.context),
+                );
               }
               break;
             default:
@@ -362,6 +380,7 @@ export class ModelResolver {
       const relationModelName = fieldDef.type;
       const relationFields = this.fieldsMap[relationModelName];
       const relationPermissions = this.permissionsConfig[relationModelName];
+      const uniqueFields = this.uniqueFieldsMap[relationModelName];
 
       if (fieldDef.isList) {
         return mapObjectValues(dataValue as ModelUpdateNestedManyInput, async ([actionName, actionValue]) => {
@@ -389,7 +408,7 @@ export class ModelResolver {
                   return transformValue(actionValue, async (value) => {
                     return {
                       create: await this.resolveCreate(relationModelName, value.create),
-                      where: mergeWhereUnique(relationFields, value.where, generateImpossibleWhere(relationFields)),
+                      where: mergeWhereUnique(relationFields, uniqueFields, value.where, generateImpossibleWhere(relationFields)),
                     };
                   });
                 } else if (relationPermissions.read !== true) {
@@ -398,7 +417,7 @@ export class ModelResolver {
                   return transformValue(actionValue, async (value) => {
                     return {
                       create: await this.resolveCreate(relationModelName, value.create),
-                      where: mergeWhereUnique(relationFields, value.where, permissionDefinition),
+                      where: mergeWhereUnique(relationFields, uniqueFields, value.where, permissionDefinition),
                     };
                   });
                 } else {
@@ -415,13 +434,13 @@ export class ModelResolver {
             case "disconnect":
               if (!relationPermissions.read) {
                 return transformValue(actionValue, async (value) => {
-                  return mergeWhereUnique(relationFields, value, generateImpossibleWhere(relationFields));
+                  return mergeWhereUnique(relationFields, uniqueFields, value, generateImpossibleWhere(relationFields));
                 });
               } else if (relationPermissions.read !== true) {
                 const permissionDefinition = await resolvePermissionDefinition(relationPermissions.read, this.context);
 
                 return transformValue(actionValue, async (value) => {
-                  return mergeWhereUnique(relationFields, value, permissionDefinition);
+                  return mergeWhereUnique(relationFields, uniqueFields, value, permissionDefinition);
                 });
               }
               break;
@@ -434,7 +453,7 @@ export class ModelResolver {
                 return transformValue(actionValue, async (value) => {
                   return {
                     data: await this.resolveUpdate(relationModelName, value.data),
-                    where: mergeWhereUnique(relationFields, value.where, permissionDefinition),
+                    where: mergeWhereUnique(relationFields, uniqueFields, value.where, permissionDefinition),
                   };
                 });
               } else {
@@ -474,7 +493,7 @@ export class ModelResolver {
                   return {
                     create,
                     update,
-                    where: mergeWhereUnique(relationFields, value.where, permissionDefinition),
+                    where: mergeWhereUnique(relationFields, uniqueFields, value.where, permissionDefinition),
                   };
                 });
               } else {
@@ -494,7 +513,7 @@ export class ModelResolver {
                 const permissionDefinition = await resolvePermissionDefinition(relationPermissions.delete, this.context);
 
                 return transformValue(actionValue, async (value) => {
-                  return mergeWhereUnique(relationFields, value, permissionDefinition);
+                  return mergeWhereUnique(relationFields, uniqueFields, value, permissionDefinition);
                 });
               }
               break;
@@ -533,7 +552,7 @@ export class ModelResolver {
                 if (!relationPermissions.read) {
                   return {
                     create: await this.resolveCreate(relationModelName, actionValue.create),
-                    where: mergeWhereUnique(relationFields, actionValue.where, generateImpossibleWhere(relationFields)),
+                    where: mergeWhereUnique(relationFields, uniqueFields, actionValue.where, generateImpossibleWhere(relationFields)),
                   };
                 } else if (relationPermissions.read !== true) {
                   const [create, permissionDefinition] = await Promise.all([
@@ -543,7 +562,7 @@ export class ModelResolver {
 
                   return {
                     create,
-                    where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
+                    where: mergeWhereUnique(relationFields, uniqueFields, actionValue.where, permissionDefinition),
                   };
                 } else {
                   return {
@@ -554,9 +573,14 @@ export class ModelResolver {
               }
             case "connect":
               if (!relationPermissions.read) {
-                return mergeWhereUnique(relationFields, actionValue, generateImpossibleWhere(relationFields));
+                return mergeWhereUnique(relationFields, uniqueFields, actionValue, generateImpossibleWhere(relationFields));
               } else if (relationPermissions.read !== true) {
-                return mergeWhereUnique(relationFields, actionValue, await resolvePermissionDefinition(relationPermissions.read, this.context));
+                return mergeWhereUnique(
+                  relationFields,
+                  uniqueFields,
+                  actionValue,
+                  await resolvePermissionDefinition(relationPermissions.read, this.context),
+                );
               }
               break;
             case "disconnect":
@@ -596,7 +620,7 @@ export class ModelResolver {
 
                   return {
                     data,
-                    where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
+                    where: mergeWhereUnique(relationFields, uniqueFields, actionValue.where, permissionDefinition),
                   };
                 }
               } else {
@@ -631,7 +655,7 @@ export class ModelResolver {
                   return {
                     create,
                     update,
-                    where: mergeWhereUnique(relationFields, actionValue.where, permissionDefinition),
+                    where: mergeWhereUnique(relationFields, uniqueFields, actionValue.where, permissionDefinition),
                   };
                 }
               } else {
