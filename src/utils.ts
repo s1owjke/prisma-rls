@@ -94,7 +94,7 @@ export function mergeWhereUnique(
   for (const [fieldName, fieldValue] of Object.entries(firstUnique)) {
     const fieldDef = fields[fieldName];
 
-    if (isUniqueField(fieldDef)) {
+    if (uniqueFields.includes(fieldName) || isUniqueField(fieldDef)) {
       unique[fieldName] = fieldValue;
     } else {
       rest[fieldName] = fieldValue;

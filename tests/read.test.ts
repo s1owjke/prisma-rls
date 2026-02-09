@@ -23,7 +23,7 @@ describe("model reading", () => {
     });
 
     test("if read is where with compound unique it return filtered result", async () => {
-      const db = resolveDb({ Post: { read: true } });
+      const db = resolveDb({ Post: { read: { id: { equals: 1 } } } });
       const post = db.post.findUnique({ where: { title_categoryId: { title: "Quick bites", categoryId: 1 } } });
       await expect(post).resolves.toMatchObject({ id: 1 });
     });
