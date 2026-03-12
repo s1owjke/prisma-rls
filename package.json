@@ -36,15 +36,15 @@
     "@prisma/client": ">=7.0.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.0",
-    "@prisma/adapter-pg": "^7.4.0",
-    "@prisma/client": "^7.4.0",
-    "@prisma/generator-helper": "^7.4.0",
-    "@types/node": "^20.12.7",
+    "@biomejs/biome": "^2.4.6",
+    "@prisma/adapter-pg": "^7.5.0",
+    "@prisma/client": "^7.5.0",
+    "@prisma/generator-helper": "^7.5.0",
+    "@types/node": "^20.19.37",
     "dotenv": "^17.3.1",
-    "prisma": "^7.4.0",
+    "prisma": "^7.5.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.0"
   }
 }
