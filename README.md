@@ -8,7 +8,7 @@ This library provides an alternative: a Prisma client extension that automatical
 
 Note that this extension doesn't apply to raw queries. For those, you must handle them manually or choose database with built-in support.
 
-> ⚠️ For Prisma versions older than 7, please use `prisma-rls@0.5.5`.
+> ⚠️ For Prisma versions older than 7, please use `prisma-rls@0.5.6`.
 
 ## Quick start
 
