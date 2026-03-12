@@ -7,7 +7,7 @@ import { AllOperationsArgs, ExtensionOptions, RecursiveContext, RelationMetadata
 import { buildFieldsMap, generateImpossibleWhere, getTransactionClient } from "./utils";
 
 export const createRlsExtension = ({ dmmf, permissionsConfig, context, authorizationError, checkRequiredBelongsTo }: ExtensionOptions) => {
-  const fieldsMap = buildFieldsMap(dmmf);
+  const { fieldsMap, uniqueFields } = buildFieldsMap(dmmf);
 
   if (!authorizationError) {
     authorizationError = new AuthorizationError();
@@ -23,7 +23,14 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
             const { model: modelName, operation: operationName, args, query } = allOperationsArgs;
 
             const modelPermissions = permissionsConfig[modelName];
-            const modelResolver = new ModelResolver(permissionsConfig, context, fieldsMap, authorizationError, !!checkRequiredBelongsTo);
+            const modelResolver = new ModelResolver(
+              permissionsConfig,
+              context,
+              fieldsMap,
+              uniqueFields,
+              authorizationError,
+              !!checkRequiredBelongsTo,
+            );
 
             switch (operationName) {
               case "findUnique":
