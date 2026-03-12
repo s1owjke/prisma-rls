@@ -1,4 +1,4 @@
-import { ReadonlyDeep } from "@prisma/client/runtime/library";
+import type { ReadonlyDeep } from "@prisma/client/runtime/client";
 
 export type DMMF = ReadonlyDeep<{
   datamodel: {

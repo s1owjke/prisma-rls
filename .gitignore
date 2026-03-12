@@ -9,3 +9,5 @@ node_modules
 
 .env
 yarn-error.log
+
+__generated__

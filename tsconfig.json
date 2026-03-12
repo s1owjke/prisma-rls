@@ -3,12 +3,13 @@
     "declaration": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "lib": ["es2020"],
-    "module": "commonjs",
+    "lib": ["ES2023"],
+    "module": "Node16",
     "outDir": "./dist",
+    "moduleResolution": "Node16",
     "skipLibCheck": true,
     "strict": true,
-    "target": "es2020",
+    "target": "ES2023"
   },
   "include": ["./src"],
   "exclude": ["node_modules"]

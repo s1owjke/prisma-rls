@@ -1,4 +1,5 @@
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
+import { describe, expect, test } from "vitest";
 
 import { resolveDb } from "./utils";
 

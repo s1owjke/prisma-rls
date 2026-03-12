@@ -1,9 +1,10 @@
-import { Prisma, PrismaClient } from "@prisma/client";
-import { ITXClientDenyList } from "@prisma/client/runtime/library";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { ITXClientDenyList } from "@prisma/client/runtime/client";
 
-import { PermissionsConfig, createRlsExtension } from "../src";
+import { Prisma, PrismaClient } from "../db/__generated__/client";
+import { dmmf } from "../db/__generated__/dmmf";
+import { createRlsExtension, PermissionsConfig } from "../src";
 import { isObject } from "../src/utils";
-
 import { denyPermissions } from "./consts";
 import { PartialPermissionsConfig } from "./types";
 
@@ -31,13 +32,15 @@ export const resolveDb = (
   options: { checkRequiredBelongsTo?: boolean } = {},
 ): PrismaClient => {
   const rlsExtension = createRlsExtension({
-    dmmf: Prisma.dmmf,
+    dmmf,
     permissionsConfig: mergeObjectsDeep(denyPermissions, overridePermissions) as PermissionsConfig<Prisma.TypeMap, null>,
     context: null,
     ...options,
   });
 
-  return new PrismaClient().$extends(rlsExtension) as unknown as PrismaClient;
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) }).$extends(
+    rlsExtension,
+  ) as unknown as PrismaClient;
 };
 
 export const executeAndRollback = async (

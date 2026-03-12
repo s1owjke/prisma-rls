@@ -1,3 +1,5 @@
+import { describe, expect, test } from "vitest";
+
 import { ReferentialIntegrityError } from "../src";
 import { resolveDb } from "./utils";
 

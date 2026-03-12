@@ -1,11 +1,11 @@
-export { AuthorizationError, ReferentialIntegrityError } from "./errors";
-export { createRlsExtension } from "./extension";
+export { AuthorizationError, ReferentialIntegrityError } from "./errors.js";
+export { createRlsExtension } from "./extension.js";
 export {
-  ExtensionOptions,
   DMMF,
-  PermissionsConfig,
+  ExtensionOptions,
   ModelPermissionsConfig,
   PermissionDefinition,
+  PermissionsConfig,
   PrismaModelWhere,
   PrismaModelWhereResolver,
-} from "./types";
+} from "./types.js";

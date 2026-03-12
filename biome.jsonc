@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "include": ["**/*.ts"],
+    "includes": ["**/*.{ts,json,jsonc}", "!!**/dist"],
     "ignoreUnknown": true
   },
   "vcs": {
@@ -20,8 +20,19 @@
   "linter": {
     "enabled": false
   },
-  "organizeImports": {
-    "enabled": true
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "useSortedKeys": "off",
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [":NODE:", ":BLANK_LINE:", ":PACKAGE:", ":BLANK_LINE:", ":PACKAGE:", ":PATH:"]
+          }
+        }
+      }
+    }
   },
   "javascript": {
     "formatter": {

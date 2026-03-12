@@ -1,10 +1,10 @@
 import { Prisma } from "@prisma/client/extension";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 
-import { AuthorizationError } from "./errors";
-import { ModelResolver } from "./logic";
-import { AllOperationsArgs, ExtensionOptions, RecursiveContext, RelationMetadata } from "./types";
-import { buildFieldsMap, generateImpossibleWhere, getTransactionClient } from "./utils";
+import { AuthorizationError } from "./errors.js";
+import { ModelResolver } from "./logic.js";
+import { AllOperationsArgs, ExtensionOptions, RecursiveContext, RelationMetadata } from "./types.js";
+import { buildFieldsMap, generateImpossibleWhere, getTransactionClient } from "./utils.js";
 
 export const createRlsExtension = ({ dmmf, permissionsConfig, context, authorizationError, checkRequiredBelongsTo }: ExtensionOptions) => {
   const { fieldsMap, uniqueFields } = buildFieldsMap(dmmf);
