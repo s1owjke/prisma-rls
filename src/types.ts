@@ -20,8 +20,6 @@ export type DMMF = ReadonlyDeep<{
 
 export type DMMFField = DMMF["datamodel"]["models"][number]["fields"][number];
 
-export type DMMFUniqueField = string[];
-
 export type PrismaTypeMap = { model: Record<string, { operations: { findMany: { args: { where?: Record<string, any> } } } }> };
 
 export type PrismaModelName<TypeMap extends PrismaTypeMap> = keyof TypeMap["model"];
@@ -80,7 +78,7 @@ export type AllOperationsArgs = { model: PrismaModelName<PrismaTypeMap> } & (
 
 export type FieldsMap = Record<string, Record<string, DMMFField>>;
 
-export type UniqueFieldsMap = Record<string, DMMFUniqueField>;
+export type UniqueFieldsMap = Record<string, string[]>;
 
 export type RelationMetadata = {
   type: "requiredBelongsTo";
