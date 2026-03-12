@@ -1,18 +1,21 @@
 import { Prisma, PrismaClientExtends } from "@prisma/client/extension";
 
-import { AllOperationsArgs, DMMF, DMMFField, FieldsMap, ObjectEntry } from "./types.js";
+import { AllOperationsArgs, DMMF, DMMFField, FieldsMap, ObjectEntry, UniqueFieldsMap } from "./types.js";
 
-export function buildFieldsMap(dmmf: DMMF): FieldsMap {
+export function buildFieldsMap(dmmf: DMMF): { fieldsMap: FieldsMap; uniqueFields: UniqueFieldsMap } {
   const fieldsMap: FieldsMap = {};
+  const uniqueFields: UniqueFieldsMap = {};
 
   for (const model of dmmf.datamodel.models) {
     fieldsMap[model.name] = {};
+    uniqueFields[model.name] = model.uniqueFields.map((uniqueField) => uniqueField.join("_"));
+
     for (const field of model.fields) {
       fieldsMap[model.name][field.name] = field;
     }
   }
 
-  return fieldsMap;
+  return { fieldsMap, uniqueFields };
 }
 
 export function getTransactionClient(prismaClient: PrismaClientExtends, allOperationsArgs: AllOperationsArgs): Prisma.TransactionClient {
@@ -81,6 +84,7 @@ export function mergeWhere(first: Record<string, unknown> | undefined, second: R
 
 export function mergeWhereUnique(
   fields: Record<string, DMMFField>,
+  uniqueFields: string[],
   firstUnique: Record<string, unknown>,
   second: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -90,7 +94,7 @@ export function mergeWhereUnique(
   for (const [fieldName, fieldValue] of Object.entries(firstUnique)) {
     const fieldDef = fields[fieldName];
 
-    if (isUniqueField(fieldDef)) {
+    if (uniqueFields.includes(fieldName) || isUniqueField(fieldDef)) {
       unique[fieldName] = fieldValue;
     } else {
       rest[fieldName] = fieldValue;
