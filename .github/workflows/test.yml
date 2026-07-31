@@ -1,0 +1,20 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - master
+
+  pull_request:
+    branches:
+      - '*'
+
+  workflow_dispatch: 
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v4
