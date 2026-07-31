@@ -9,12 +9,48 @@ on:
     branches:
       - '*'
 
-  workflow_dispatch: 
-
 jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:17.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespass
+          POSTGRES_DB: rls_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgrespass@127.0.0.1:5432/rls_test
+
     steps:
       - name: Git checkout
         uses: actions/checkout@v4
+
+      - name: Install node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn --frozen-lockfile
+
+      - name: Build prisma client
+        run: yarn prisma generate
+
+      - name: Migrate and seed database
+        run: |
+          yarn prisma migrate dev
+          yarn prisma db seed
+
+      - name: Test
+        run: yarn test
