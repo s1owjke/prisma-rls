@@ -36,11 +36,11 @@
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "@prisma/internals": "^7.9.1",
-    "@types/node": "^20.12.7",
+    "@types/node": "^20.19.43",
     "dotenv": "^17.4.2",
     "prisma": "^7.9.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5",
+    "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }
 }
