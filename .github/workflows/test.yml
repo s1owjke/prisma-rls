@@ -17,7 +17,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17.4
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgrespass
@@ -50,7 +50,9 @@ jobs:
         run: yarn prisma generate
 
       - name: Migrate and seed database
-        run: yarn prisma migrate dev
+        run: |
+          yarn prisma migrate dev
+          yarn prisma db seed
 
       - name: Test
         run: yarn test

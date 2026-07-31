@@ -38,6 +38,10 @@ import { PrismaClient } from "./generated/client";
     ],
   });
 
+  for (const table of ["User", "Category", "Post", "Comment"]) {
+    await prisma.$executeRawUnsafe(`SELECT setval(pg_get_serial_sequence('"${table}"', 'id'), (SELECT MAX(id) FROM "${table}"))`);
+  }
+
   try {
     process.exit(0);
   } catch (error) {
