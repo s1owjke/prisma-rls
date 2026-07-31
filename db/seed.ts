@@ -1,6 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 
-import { PrismaClient } from "./__generated__/client";
+import { PrismaClient } from "./generated/client";
 
 (async () => {
   const prisma = new PrismaClient({

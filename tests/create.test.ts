@@ -6,7 +6,7 @@ import { executeAndRollback, resolveDb } from "./utils";
 describe("model creating", () => {
   describe("create", () => {
     test("if create is denied it throw an error", async () => {
-      const db = resolveDb();
+      const db = await resolveDb();
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.user.create({ data: { email: "shawn.hudson@test.local", name: "Shawn Hudson" } });
@@ -15,7 +15,7 @@ describe("model creating", () => {
     });
 
     test("if create is allowed it allows to create", async () => {
-      const db = resolveDb({ User: { create: true } });
+      const db = await resolveDb({ User: { create: true } });
 
       await executeAndRollback(db, async (tx) => {
         const users = tx.user.create({ data: { email: "shawn.hudson@test.local", name: "Shawn Hudson" } });
@@ -26,7 +26,7 @@ describe("model creating", () => {
 
   describe("create many", () => {
     test("if create is denied it throw an error", async () => {
-      const db = resolveDb();
+      const db = await resolveDb();
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.user.createMany({ data: { email: "shawn.hudson@test.local", name: "Shawn Hudson" } });
@@ -35,7 +35,7 @@ describe("model creating", () => {
     });
 
     test("if create is allowed it allows to create", async () => {
-      const db = resolveDb({ User: { create: true } });
+      const db = await resolveDb({ User: { create: true } });
 
       await executeAndRollback(db, async (tx) => {
         const users = tx.user.createMany({ data: { email: "shawn.hudson@test.local", name: "Shawn Hudson" } });
@@ -46,7 +46,7 @@ describe("model creating", () => {
 
   describe("create many and return", () => {
     test("if create is denied it throw an error", async () => {
-      const db = resolveDb();
+      const db = await resolveDb();
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.user.createManyAndReturn({ data: { email: "shawn.hudson@test.local", name: "Shawn Hudson" } });
@@ -55,7 +55,7 @@ describe("model creating", () => {
     });
 
     test("if create is allowed it allows to create", async () => {
-      const db = resolveDb({ User: { create: true } });
+      const db = await resolveDb({ User: { create: true } });
 
       await executeAndRollback(db, async (tx) => {
         const users = tx.user.createManyAndReturn({ data: { email: "shawn.hudson@test.local", name: "Shawn Hudson" } });

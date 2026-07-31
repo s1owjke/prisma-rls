@@ -5,6 +5,7 @@ Thumbs.db
 .vscode
 
 dist
+generated
 node_modules
 
 .env

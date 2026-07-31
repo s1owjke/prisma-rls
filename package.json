@@ -1,7 +1,6 @@
 {
   "name": "prisma-rls",
-  "version": "0.5.6",
-  "type": "module",
+  "version": "1.0.0",
   "description": "Prisma client extension for row-level security on any database",
   "license": "MIT",
   "keywords": [
@@ -14,6 +13,7 @@
   ],
   "author": "s1owjke",
   "homepage": "https://github.com/s1owjke/prisma-rls",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -26,25 +26,21 @@
     "lint:fix": "biome check --write",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest watch",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "prisma:migrate:reset": "prisma migrate reset",
-    "prisma:db:seed": "prisma db seed"
+    "test:watch": "vitest watch"
   },
   "peerDependencies": {
     "@prisma/client": ">=7.0.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.6",
-    "@prisma/adapter-pg": "^7.5.0",
-    "@prisma/client": "^7.5.0",
-    "@prisma/generator-helper": "^7.5.0",
-    "@types/node": "^20.19.37",
-    "dotenv": "^17.3.1",
-    "prisma": "^7.5.0",
+    "@biomejs/biome": "^2.5.6",
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "@prisma/internals": "^7.9.1",
+    "@types/node": "^20.12.7",
+    "dotenv": "^17.4.2",
+    "prisma": "^7.9.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.0"
+    "typescript": "^5.4.5",
+    "vitest": "^4.1.10"
   }
 }

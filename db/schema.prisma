@@ -1,16 +1,6 @@
 generator client {
-  provider               = "prisma-client"
-  output                 = "__generated__"
-  engineType             = "client"
-  generatedFileExtension = "ts"
-  importFileExtension    = ""
-  moduleFormat           = "esm"
-  runtime                = "nodejs"
-}
-
-generator dmmf {
-  provider = "node ./db/generators/dmmf.ts"
-  output   = "./__generated__/dmmf.ts"
+  provider = "prisma-client"
+  output   = "./generated"
 }
 
 datasource db {

@@ -1,8 +1,11 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import { PrismaPg } from "@prisma/adapter-pg";
 import { ITXClientDenyList } from "@prisma/client/runtime/client";
+import { getDMMF } from "@prisma/internals";
 
-import { Prisma, PrismaClient } from "../db/__generated__/client";
-import { dmmf } from "../db/__generated__/dmmf";
+import { Prisma, PrismaClient } from "../db/generated/client";
 import { createRlsExtension, PermissionsConfig } from "../src";
 import { isObject } from "../src/utils";
 import { denyPermissions } from "./consts";
@@ -27,20 +30,22 @@ const mergeObjectsDeep = (first: Record<string, unknown>, second: Record<string,
   return result;
 };
 
-export const resolveDb = (
+export const resolveDb = async (
   overridePermissions: PartialPermissionsConfig<Prisma.TypeMap, null> = {},
   options: { checkRequiredBelongsTo?: boolean } = {},
-): PrismaClient => {
+): Promise<PrismaClient> => {
+  const datamodel = await readFile(path.resolve("./db/schema.prisma"), "utf8");
+
   const rlsExtension = createRlsExtension({
-    dmmf,
+    dmmf: await getDMMF({ datamodel }),
     permissionsConfig: mergeObjectsDeep(denyPermissions, overridePermissions) as PermissionsConfig<Prisma.TypeMap, null>,
     context: null,
     ...options,
   });
 
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) }).$extends(
-    rlsExtension,
-  ) as unknown as PrismaClient;
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+
+  return new PrismaClient({ adapter }).$extends(rlsExtension) as unknown as PrismaClient;
 };
 
 export const executeAndRollback = async (
