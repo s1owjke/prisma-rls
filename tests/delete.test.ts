@@ -1,4 +1,5 @@
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
+import { describe, expect, test } from "vitest";
 
 import { AuthorizationError } from "../src";
 import { executeAndRollback, resolveDb } from "./utils";
@@ -6,7 +7,7 @@ import { executeAndRollback, resolveDb } from "./utils";
 describe("model deletion", () => {
   describe("delete", () => {
     test("if delete is denied it throw an error", async () => {
-      const db = resolveDb();
+      const db = await resolveDb();
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.post.delete({ where: { id: 1 } });
@@ -15,7 +16,7 @@ describe("model deletion", () => {
     });
 
     test("if delete is allowed it allows to delete", async () => {
-      const db = resolveDb({ Post: { delete: true } });
+      const db = await resolveDb({ Post: { delete: true } });
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.post.delete({ where: { id: 1 } });
@@ -24,7 +25,7 @@ describe("model deletion", () => {
     });
 
     test("if delete is where it allows to delete only records that match the filter", async () => {
-      const db = resolveDb({ Post: { delete: { published: false } } });
+      const db = await resolveDb({ Post: { delete: { published: false } } });
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.post.delete({ where: { id: 1 } });
@@ -35,7 +36,7 @@ describe("model deletion", () => {
 
   describe("delete many", () => {
     test("if delete is denied it throw an error", async () => {
-      const db = resolveDb();
+      const db = await resolveDb();
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.post.deleteMany({ where: { id: { equals: 1 } } });
@@ -44,7 +45,7 @@ describe("model deletion", () => {
     });
 
     test("if delete is allowed it allows to delete", async () => {
-      const db = resolveDb({ Post: { delete: true } });
+      const db = await resolveDb({ Post: { delete: true } });
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.post.deleteMany({ where: { id: 1 } });
@@ -53,7 +54,7 @@ describe("model deletion", () => {
     });
 
     test("if delete is where it allows to delete only records that match the filter", async () => {
-      const db = resolveDb({ Post: { delete: { published: false } } });
+      const db = await resolveDb({ Post: { delete: { published: false } } });
 
       await executeAndRollback(db, async (tx) => {
         const user = tx.post.deleteMany({ where: { id: 1 } });

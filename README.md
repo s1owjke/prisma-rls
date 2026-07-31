@@ -8,6 +8,15 @@ This library provides an alternative: a Prisma client extension that automatical
 
 Note that this extension doesn't apply to raw queries. For those, you must handle them manually or choose database with built-in support.
 
+## Compatibility
+
+| prisma-rls | @prisma/client       |
+| ---------- | -------------------- |
+| 1.x        | `>=7.0.0`            |
+| 0.x        | `>=4.16.1, <7.0.0`   |
+
+Version 7 introduced a new client generator `provider = "prisma-client"` with ESM support, which is a breaking change for this library's DMMF handling, see [Obtaining the DMMF](#obtaining-the-dmmf). If you're on an older Prisma Client, just stay on the `0.x` release.
+
 ## Quick start
 
 Define shared types:
@@ -71,7 +80,11 @@ export const permissionsRegistry = {
 Prisma extensions don't support dynamic contexts, so create an extension per context:
 
 ```typescript
-import { Prisma, PrismaClient } from "@prisma/client";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
+import { PrismaClient } from "@prisma/client";
+import { getDMMF } from "@prisma/internals";
 import Fastify, { FastifyRequest } from "fastify";
 import { createRlsExtension } from "prisma-rls";
 
@@ -81,6 +94,9 @@ import { permissionsRegistry, PermissionsContext } from "./permissions";
   const prisma = new PrismaClient();
   const server = Fastify();
 
+  const datamodel = await readFile(path.resolve("./db/schema.prisma"), "utf8");
+  const dmmf = await getDMMF({ datamodel });
+
   const resolveRequestConext = async (request: FastifyRequest) => {
     const user = await resolveUser(request.headers.authorization);
     const userRole = user ? user.role : "Guest";
@@ -88,7 +104,7 @@ import { permissionsRegistry, PermissionsContext } from "./permissions";
     const permissionsContext: PermissionsContext = { user };
 
     const rlsExtension = createRlsExtension({
-      dmmf: Prisma.dmmf,
+      dmmf,
       permissionsConfig: permissionsRegistry[userRole],
       context: permissionsContext,
     });
@@ -109,7 +125,48 @@ After that, all non-raw queries will be executed according to the defined permis
 
 ## Edge cases
 
-At the moment there is only a known edge case.
+### Obtaining the DMMF
+
+The new client generator `provider = "prisma-client"` no longer exposes `Prisma.dmmf`. Until an official replacement lands, these workarounds rely on internal, unstable Prisma APIs and are meant to bridge this transition period.
+
+**Prisma internals** - parse the schema at runtime (simplest, but requires a schema file to be present at runtime):
+
+```typescript
+import { readFile } from "node:fs/promises";
+import { getDMMF } from "@prisma/internals";
+
+const datamodel = await readFile("./prisma/schema.prisma", "utf8");
+const dmmf = await getDMMF({ datamodel });
+```
+
+**Custom generator** - capture it once at `prisma generate` time instead:
+
+```typescript
+import { writeFile } from "node:fs/promises";
+import { generatorHandler, GeneratorOptions } from "@prisma/generator-helper";
+
+generatorHandler({
+  onManifest: () => ({ defaultOutput: "./dmmf.ts" }),
+  onGenerate: async (options: GeneratorOptions) => {
+    await writeFile(options.generator.output!.value, `export default ${JSON.stringify(options.dmmf)} as const;`);
+  },
+});
+```
+
+```prisma
+generator dmmf {
+  provider = "node ./db/generators/dmmf.ts"
+  output   = "./generated/dmmf.ts"
+}
+```
+
+```typescript
+import dmmf from "../db/generated/dmmf";
+
+const rlsExtension = createRlsExtension({ dmmf });
+```
+
+Also, when prisma is built for edge runtimes such as cloudflare workers, it no longer exposes the `dmmf` property, so use one of the approaches above.
 
 ### Required belongs-to
 
@@ -119,7 +176,7 @@ In these cases, Prisma does not generate filters due to potential referential in
 
 ```typescript
 const rlsExtension = createRlsExtension({
-  dmmf: Prisma.dmmf,
+  dmmf,
   permissionsConfig: permissionsRegistry[userRole],
   context: permissionsContext,
   checkRequiredBelongsTo: true,
@@ -150,30 +207,3 @@ Alternatively, you can consider the following options:
 
 - Make them optional - keep the foreign keys required but define the relationships as optional
 - Handle at the policy level - apply consistent policy filters to restrict access to both sides of relation
-
-### Edge runtime
-
-When prisma is built for edge runtimes such as cloudflare workers, it no longer exposes the `dmmf` property. To work around this, you can use the [Pothos generator](https://pothos-graphql.dev/docs/plugins/prisma/setup#edge-run-times) to generate a compatible datamodel.
-
-```prisma
-generator pothos {
-  provider          = "prisma-pothos-types"
-  clientOutput      = "@prisma/client"
-  output            = "./pothos-types.ts"
-  generateDatamodel = true
-}
-```
-
-The only change you need to make is replacing the `dmmf` property source, everything else remains the same:
-
-```typescript
-import { getDatamodel } from "@pothos/plugin-prisma/generated";
-
-const rlsExtension = createRlsExtension({
-  dmmf: {
-    datamodel: {
-      models: Object.entries(getDatamodel()["datamodel"]["models"]).map(([name, model]) => ({ ...model, name })),
-    },
-  },
-});
-```

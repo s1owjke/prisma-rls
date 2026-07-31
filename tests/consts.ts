@@ -1,5 +1,4 @@
-import { Prisma } from "@prisma/client";
-
+import { Prisma } from "../db/generated/client";
 import { PermissionsConfig } from "../src";
 
 export const denyPermissions: PermissionsConfig<Prisma.TypeMap, null> = {
