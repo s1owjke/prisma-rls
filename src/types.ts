@@ -14,6 +14,9 @@ export type DMMF = ReadonlyDeep<{
         type: string;
       }[];
       uniqueFields: string[][];
+      primaryKey?: {
+        fields: string[];
+      } | null;
     }[];
   };
 }>;
