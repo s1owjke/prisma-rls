@@ -8,6 +8,7 @@ export function buildFieldsMap(dmmf: DMMF): { fieldsMap: FieldsMap; uniqueFields
 
   for (const model of dmmf.datamodel.models) {
     fieldsMap[model.name] = {};
+
     uniqueFields[model.name] = [
       ...model.uniqueFields.map((uniqueField) => uniqueField.join("_")),
       ...(model.primaryKey ? [model.primaryKey.fields.join("_")] : []),
