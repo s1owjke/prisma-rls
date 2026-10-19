@@ -8,10 +8,11 @@ datasource db {
 }
 
 model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
-  posts Post[]
+  id          Int          @id @default(autoincrement())
+  email       String       @unique
+  name        String?
+  posts       Post[]
+  memberships Membership[]
 }
 
 model Post {
@@ -46,4 +47,13 @@ model Category {
   updatedAt DateTime @updatedAt
   name      String
   posts     Post[]
+}
+
+model Membership {
+  tenantId Int
+  userId   Int
+  role     String
+  user     User   @relation(fields: [userId], references: [id])
+
+  @@id([tenantId, userId])
 }

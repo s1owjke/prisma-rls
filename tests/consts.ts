@@ -26,4 +26,10 @@ export const denyPermissions: PermissionsConfig<Prisma.TypeMap, null> = {
     update: false,
     delete: false,
   },
+  Membership: {
+    read: false,
+    create: false,
+    update: false,
+    delete: false,
+  },
 };

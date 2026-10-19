@@ -38,6 +38,14 @@ import { PrismaClient } from "./generated/client";
     ],
   });
 
+  await prisma.membership.createMany({
+    data: [
+      { tenantId: 1, userId: 1, role: "admin" },
+      { tenantId: 1, userId: 2, role: "member" },
+      { tenantId: 2, userId: 1, role: "member" },
+    ],
+  });
+
   for (const table of ["User", "Category", "Post", "Comment"]) {
     await prisma.$executeRawUnsafe(`SELECT setval(pg_get_serial_sequence('"${table}"', 'id'), (SELECT MAX(id) FROM "${table}"))`);
   }

@@ -175,4 +175,61 @@ describe("model reading", () => {
       ]);
     });
   });
+
+  describe("composite primary key", () => {
+    describe.each(["findUnique", "findUniqueOrThrow"] as const)("%s", (operation) => {
+      test("returns the record selected by both primary-key fields when read is allowed", async () => {
+        const db = await resolveDb({ Membership: { read: true } });
+
+        await expect(db.membership[operation]({ where: { tenantId_userId: { tenantId: 1, userId: 2 } } })).resolves.toEqual({
+          tenantId: 1,
+          userId: 2,
+          role: "member",
+        });
+      });
+
+      test("returns the selected record when it matches the read filter", async () => {
+        const db = await resolveDb({ Membership: { read: { tenantId: 1 } } });
+
+        await expect(db.membership[operation]({ where: { tenantId_userId: { tenantId: 1, userId: 1 } } })).resolves.toEqual({
+          tenantId: 1,
+          userId: 1,
+          role: "admin",
+        });
+      });
+
+      test.each([false, { tenantId: 2 }])("hides the record when read permission is %j", async (read) => {
+        const db = await resolveDb({ Membership: { read } });
+        const membership = db.membership[operation]({ where: { tenantId_userId: { tenantId: 1, userId: 1 } } });
+
+        if (operation === "findUnique") {
+          await expect(membership).resolves.toBeNull();
+        } else {
+          await expect(membership).rejects.toMatchObject({ code: "P2025" });
+        }
+      });
+
+      test("preserves additional caller filters alongside the composite key and read filter", async () => {
+        const db = await resolveDb({ Membership: { read: { tenantId: 1 } } });
+        const membership = db.membership[operation]({
+          where: { tenantId_userId: { tenantId: 1, userId: 1 }, role: "member" },
+        });
+
+        if (operation === "findUnique") {
+          await expect(membership).resolves.toBeNull();
+        } else {
+          await expect(membership).rejects.toMatchObject({ code: "P2025" });
+        }
+      });
+    });
+
+    test("findMany returns only records matching the read filter", async () => {
+      const db = await resolveDb({ Membership: { read: { tenantId: 1 } } });
+
+      await expect(db.membership.findMany({ orderBy: { userId: "asc" } })).resolves.toEqual([
+        { tenantId: 1, userId: 1, role: "admin" },
+        { tenantId: 1, userId: 2, role: "member" },
+      ]);
+    });
+  });
 });
