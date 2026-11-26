@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client/extension";
 import { ReferentialIntegrityError } from "./errors.js";
 import type {
   FieldsMap,
+  KeyFieldsMap,
   ModelCreateInput,
   ModelCreateNestedManyInput,
   ModelCreateNestedOneInput,
@@ -22,7 +23,7 @@ import type {
 } from "./types.js";
 import {
   generateImpossibleWhere,
-  getUniqueField,
+  getKeyFields,
   isObject,
   lowerFirst,
   mapObjectValues,
@@ -40,6 +41,7 @@ export class ModelResolver {
     protected context: unknown,
     protected fieldsMap: FieldsMap,
     protected uniqueFieldsMap: UniqueFieldsMap,
+    protected keyFieldsMap: KeyFieldsMap,
     protected authorizationError: Error,
     protected checkRequiredBelongsTo: boolean,
   ) {}
@@ -139,12 +141,12 @@ export class ModelResolver {
         const narrowedSelectValue = selectValue as true | ModelSelectNestedRequiredInput;
 
         if (this.checkRequiredBelongsTo && relationPermissions.read !== true) {
-          const uniqueField = getUniqueField(relationFields);
+          const keyFields = getKeyFields(this.keyFieldsMap, relationModelName);
 
           if (
             isObject(narrowedSelectValue) &&
             isObject(narrowedSelectValue.select) &&
-            !narrowedSelectValue.select[uniqueField.name] &&
+            keyFields.some((keyField) => !(narrowedSelectValue.select as ModelSelectInput)[keyField]) &&
             !narrowedSelectValue.include
           ) {
             throw new Error("You must select a primary key or other unique field for the required belongs to relations");
@@ -708,17 +710,26 @@ export class ModelResolver {
             continue;
           }
 
-          const uniqueField = getUniqueField(this.fieldsMap[relationMetadata.modelName]);
-          const uniqueFieldValues = uniqueArray(matchingRelations.map((relation) => relation[uniqueField.name]));
+          const keyFields = getKeyFields(this.keyFieldsMap, relationMetadata.modelName);
+          let keysWhere: Record<string, unknown>;
+          let keysCount: number;
+
+          if (keyFields.length === 1) {
+            const keyValues = uniqueArray(matchingRelations.map((relation) => relation[keyFields[0]]));
+            keysWhere = { [keyFields[0]]: { in: keyValues } };
+            keysCount = keyValues.length;
+          } else {
+            const keys = matchingRelations.map((relation) => Object.fromEntries(keyFields.map((keyField) => [keyField, relation[keyField]])));
+            const uniqueKeys = [...new Map(keys.map((key) => [JSON.stringify(key), key])).values()];
+            keysWhere = { OR: uniqueKeys };
+            keysCount = uniqueKeys.length;
+          }
 
           const allowedCount = await transactionClient[lowerFirst(relationMetadata.modelName)].count({
-            where: mergeWhere(
-              { [uniqueField.name]: { in: uniqueFieldValues } },
-              await resolvePermissionDefinition(relationPermissions.read, this.context),
-            ),
+            where: mergeWhere(keysWhere, await resolvePermissionDefinition(relationPermissions.read, this.context)),
           });
 
-          if (uniqueFieldValues.length !== allowedCount) {
+          if (keysCount !== allowedCount) {
             throw new ReferentialIntegrityError();
           }
 
