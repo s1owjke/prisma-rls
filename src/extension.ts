@@ -7,7 +7,7 @@ import { AllOperationsArgs, ExtensionOptions, RecursiveContext, RelationMetadata
 import { buildFieldsMap, generateImpossibleWhere, getTransactionClient } from "./utils.js";
 
 export const createRlsExtension = ({ dmmf, permissionsConfig, context, authorizationError, checkRequiredBelongsTo }: ExtensionOptions) => {
-  const { fieldsMap, uniqueFields } = buildFieldsMap(dmmf);
+  const { fieldsMap, uniqueFields, keyFields } = buildFieldsMap(dmmf);
 
   if (!authorizationError) {
     authorizationError = new AuthorizationError();
@@ -28,6 +28,7 @@ export const createRlsExtension = ({ dmmf, permissionsConfig, context, authoriza
               context,
               fieldsMap,
               uniqueFields,
+              keyFields,
               authorizationError,
               !!checkRequiredBelongsTo,
             );

@@ -1,10 +1,11 @@
 import { Prisma, PrismaClientExtends } from "@prisma/client/extension";
 
-import { AllOperationsArgs, DMMF, DMMFField, FieldsMap, ObjectEntry, UniqueFieldsMap } from "./types.js";
+import { AllOperationsArgs, DMMF, DMMFField, FieldsMap, KeyFieldsMap, ObjectEntry, UniqueFieldsMap } from "./types.js";
 
-export function buildFieldsMap(dmmf: DMMF): { fieldsMap: FieldsMap; uniqueFields: UniqueFieldsMap } {
+export function buildFieldsMap(dmmf: DMMF): { fieldsMap: FieldsMap; uniqueFields: UniqueFieldsMap; keyFields: KeyFieldsMap } {
   const fieldsMap: FieldsMap = {};
   const uniqueFields: UniqueFieldsMap = {};
+  const keyFields: KeyFieldsMap = {};
 
   for (const model of dmmf.datamodel.models) {
     fieldsMap[model.name] = {};
@@ -17,9 +18,28 @@ export function buildFieldsMap(dmmf: DMMF): { fieldsMap: FieldsMap; uniqueFields
     for (const field of model.fields) {
       fieldsMap[model.name][field.name] = field;
     }
+
+    keyFields[model.name] = resolveKeyFields(model);
   }
 
-  return { fieldsMap, uniqueFields };
+  return { fieldsMap, uniqueFields, keyFields };
+}
+
+// Fields identifying a record: @id, @@id, @unique or @@unique, in this order of preference
+function resolveKeyFields(model: DMMF["datamodel"]["models"][number]): string[] {
+  const idField = model.fields.find((field) => field.isId);
+  if (idField) {
+    return [idField.name];
+  } else if (model.primaryKey) {
+    return [...model.primaryKey.fields];
+  }
+
+  const uniqueField = model.fields.find((field) => field.isUnique);
+  if (uniqueField) {
+    return [uniqueField.name];
+  }
+
+  return [...(model.uniqueFields[0] ?? [])];
 }
 
 export function getTransactionClient(prismaClient: PrismaClientExtends, allOperationsArgs: AllOperationsArgs): Prisma.TransactionClient {
@@ -33,7 +53,13 @@ export function getTransactionClient(prismaClient: PrismaClientExtends, allOpera
 }
 
 export function generateImpossibleWhere(fields: Record<string, DMMFField>): Record<string, unknown> {
-  const uniqueField = getUniqueField(fields);
+  // Any required scalar works for an always-false filter
+  const uniqueField =
+    Object.values(fields).find(isUniqueField) ?? Object.values(fields).find((field) => field.kind === "scalar" && field.isRequired && !field.isList);
+
+  if (!uniqueField) {
+    throw new Error("Couldn't find a required scalar field to generate impossible where");
+  }
 
   switch (uniqueField.type) {
     case "Boolean":
@@ -73,13 +99,13 @@ export function isUniqueField(fieldDef: DMMFField): boolean {
   return fieldDef.isId || fieldDef.isUnique;
 }
 
-export function getUniqueField(fields: Record<string, DMMFField>): DMMFField {
-  const fieldDef = Object.values(fields).find(isUniqueField);
-  if (!fieldDef) {
+export function getKeyFields(keyFields: KeyFieldsMap, modelName: string): string[] {
+  const fields = keyFields[modelName];
+  if (!fields?.length) {
     throw new Error("Couldn't find primary key or other unique field");
   }
 
-  return fieldDef;
+  return fields;
 }
 
 export function mergeWhere(first: Record<string, unknown> | undefined, second: Record<string, unknown>): Record<string, unknown> {

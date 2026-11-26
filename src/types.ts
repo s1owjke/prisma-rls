@@ -83,6 +83,8 @@ export type FieldsMap = Record<string, Record<string, DMMFField>>;
 
 export type UniqueFieldsMap = Record<string, string[]>;
 
+export type KeyFieldsMap = Record<string, string[]>;
+
 export type RelationMetadata = {
   type: "requiredBelongsTo";
   path: string;

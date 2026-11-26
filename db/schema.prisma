@@ -50,10 +50,19 @@ model Category {
 }
 
 model Membership {
-  tenantId Int
-  userId   Int
-  role     String
-  user     User   @relation(fields: [userId], references: [id])
+  tenantId    Int
+  userId      Int
+  role        String
+  user        User         @relation(fields: [userId], references: [id])
+  assignments Assignment[]
 
   @@id([tenantId, userId])
+}
+
+model Assignment {
+  id         Int        @id @default(autoincrement())
+  title      String
+  tenantId   Int
+  userId     Int
+  membership Membership @relation(fields: [tenantId, userId], references: [tenantId, userId], onDelete: Cascade)
 }
